@@ -1,311 +1,346 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Calendar, Users, MessageCircle, Phone, LogOut, User, ArrowLeft, Plus, Search, Edit, Trash2, Clock } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { capitalizeName } from '@/lib/utils';
+import { 
+  Phone, 
+  Plus, 
+  Search, 
+  Eye, 
+  Edit, 
+  Trash2,
+  Clock,
+  User,
+  PhoneCall,
+  PhoneIncoming,
+  PhoneOutgoing,
+  PhoneMissed,
+  LogOut
+} from 'lucide-react';
+
+interface PhoneCall {
+  id: string;
+  customer_name: string;
+  phone_number: string;
+  call_type: string;
+  duration: number;
+  notes: string;
+  created_at: string;
+}
 
 export default function PhoneCallsPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [calls, setCalls] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [calls, setCalls] = useState<PhoneCall[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    checkUser()
-  }, [])
+    checkUser();
+  }, []);
 
   const checkUser = async () => {
     try {
-      const { data: sessionData } = await auth.getSession()
-      
-      if (sessionData.session) {
-        setUser(sessionData.session.user)
-        await loadCalls(sessionData.session.user.id)
-      } else {
-        const { user: currentUser } = await auth.getCurrentUser()
-        if (currentUser) {
-          setUser(currentUser)
-          await loadCalls(currentUser.id)
-        } else {
-          router.push('/login')
-          return
-        }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
       }
-    } catch (err) {
-      console.error('Auth check error:', err)
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
-      setLoading(false)
+      setUser(user);
+      await loadCalls(user.id);
+    } catch (error) {
+      console.error('Error checking user:', error);
+      router.push('/login');
     }
-  }
+  };
 
   const loadCalls = async (userId: string) => {
     try {
-      const { data, error } = await db.getPhoneCalls(userId)
-      if (error) {
-        console.error('Error loading calls:', error)
-      } else {
-        setCalls(data || [])
+      const { data: profile } = await supabase
+        .from('salon_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (profile) {
+        const { data: callsData } = await supabase
+          .from('phone_calls')
+          .select('*')
+          .eq('salon_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (callsData) {
+          setCalls(callsData);
+        }
       }
     } catch (error) {
-      console.error('Error loading calls:', error)
+      console.error('Error loading calls:', error);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  const handleSignOut = async () => {
+  const filteredCalls = calls.filter(call =>
+    capitalizeName(call.customer_name).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    call.phone_number.includes(searchTerm) ||
+    call.notes.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleDelete = async (callId: string) => {
+    if (!confirm('Bu aramayı silmek istediğinizden emin misiniz?')) return;
+
     try {
-      await auth.signOut()
-      router.push('/')
-    } catch (err) {
-      console.error('Sign out error:', err)
-    }
-  }
+      const { error } = await supabase
+        .from('phone_calls')
+        .delete()
+        .eq('id', callId);
 
-  const getCallTypeColor = (type: string) => {
+      if (error) throw error;
+
+      setCalls(prev => prev.filter(call => call.id !== callId));
+      alert('Arama başarıyla silindi!');
+    } catch (error) {
+      console.error('Error deleting call:', error);
+      alert('Arama silinirken hata oluştu.');
+    }
+  };
+
+  const getCallTypeIcon = (type: string) => {
     switch (type) {
       case 'incoming':
-        return 'bg-green-100 text-green-800'
+        return <PhoneIncoming className="w-4 h-4 text-green-400" />;
       case 'outgoing':
-        return 'bg-blue-100 text-blue-800'
+        return <PhoneOutgoing className="w-4 h-4 text-blue-400" />;
       case 'missed':
-        return 'bg-red-100 text-red-800'
+        return <PhoneMissed className="w-4 h-4 text-red-400" />;
       default:
-        return 'bg-gray-100 text-gray-800'
+        return <PhoneCall className="w-4 h-4 text-gray-400" />;
     }
-  }
+  };
 
   const getCallTypeText = (type: string) => {
     switch (type) {
       case 'incoming':
-        return 'Gelen'
+        return 'Gelen';
       case 'outgoing':
-        return 'Giden'
+        return 'Giden';
       case 'missed':
-        return 'Cevapsız'
+        return 'Cevapsız';
       default:
-        return type
+        return 'Bilinmiyor';
     }
-  }
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800'
+  const getCallTypeColor = (type: string) => {
+    switch (type) {
+      case 'incoming':
+        return 'text-green-400';
+      case 'outgoing':
+        return 'text-blue-400';
       case 'missed':
-        return 'bg-red-100 text-red-800'
-      case 'busy':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'text-gray-400';
     }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'Tamamlandı'
-      case 'missed':
-        return 'Cevapsız'
-      case 'busy':
-        return 'Meşgul'
-      default:
-        return status
-    }
-  }
+  };
 
   const formatDuration = (seconds: number) => {
-    if (!seconds || seconds === 0) return '0:00'
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
-  }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
-  const filteredCalls = calls.filter(call =>
-    call.customer_phone?.includes(searchTerm) ||
-    getCallTypeText(call.call_type).toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const formatDateTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #e0f2fe)' }}>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Yükleniyor...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-white rounded-full animate-spin"></div>
+          <span className="text-gray-300">Yükleniyor...</span>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #e0f2fe)' }}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => router.push('/dashboard')}
-                className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
+                className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Dashboard'a Dön</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Dashboard</span>
               </button>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">Telefon Aramaları</span>
-              </div>
+              <span className="text-gray-400">|</span>
+              <h1 className="text-2xl font-bold text-white">Telefon Aramaları</h1>
+              <span className="text-gray-400">|</span>
+              <span className="text-gray-300">Toplam {calls.length} arama</span>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-600">
-                <User className="w-4 h-4" />
-                <span>{user?.email}</span>
-              </div>
               <button
-                onClick={handleSignOut}
-                className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
+                onClick={() => router.push('/phone-calls/new')}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all duration-300"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Yeni Arama</span>
+              </button>
+              
+              {/* Profile Menu */}
+              <div className="relative">
+                <button className="flex items-center space-x-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+                  <User className="w-5 h-5 text-gray-300" />
+                  <span className="text-gray-300 text-sm">{user?.email}</span>
+                </button>
+              </div>
+
+              {/* Sign Out */}
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  router.push('/login');
+                }}
+                className="flex items-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Çıkış Yap</span>
+                <span className="text-sm">Çıkış</span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Telefon Aramaları</h1>
-              <p className="text-gray-600">Toplam {calls.length} arama</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Arama ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-              <button
-                onClick={() => router.push('/phone-calls/new')}
-                className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Yeni Arama</span>
-              </button>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Arama ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+            />
           </div>
         </div>
 
         {/* Calls Table */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-700/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Telefon
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Müşteri
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tip
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Arama Türü
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Süre
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Durum
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Tarih & Saat
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tarih
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     İşlemler
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCalls.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                      {searchTerm ? 'Arama sonucu bulunamadı.' : 'Henüz arama bulunmuyor.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCalls.map((call) => (
-                    <tr 
-                      key={call.id} 
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
-                      onClick={() => router.push(`/phone-calls/${call.id}`)}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                            <Phone className="w-5 h-5 text-purple-600" />
+              <tbody className="divide-y divide-gray-700">
+                {filteredCalls.map((call) => (
+                  <tr key={call.id} className="hover:bg-gray-700/30 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                          <Phone className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-white">
+                            {capitalizeName(call.customer_name)}
                           </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{call.customer_phone}</div>
+                          <div className="text-sm text-gray-400">
+                            {call.phone_number}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCallTypeColor(call.call_type)}`}>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        {getCallTypeIcon(call.call_type)}
+                        <span className={`text-sm font-medium ${getCallTypeColor(call.call_type)}`}>
                           {getCallTypeText(call.call_type)}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 text-gray-400 mr-1" />
-                          <span className="text-sm text-gray-900">{formatDuration(call.duration)}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(call.status)}`}>
-                          {getStatusText(call.status)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-300">
+                          {formatDuration(call.duration)}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(call.created_at).toLocaleDateString('tr-TR')}
-                        <br />
-                        {new Date(call.created_at).toLocaleTimeString('tr-TR', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div 
-                          className="flex items-center space-x-2"
-                          onClick={(e) => e.stopPropagation()} // Prevent row click when action buttons are clicked
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">
+                        {formatDateTime(call.created_at)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => router.push(`/phone-calls/${call.id}`)}
+                          className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
                         >
-                          <button className="text-blue-600 hover:text-blue-900">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button className="text-red-600 hover:text-red-900">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                          <Eye className="w-4 h-4 text-gray-300" />
+                        </button>
+                        <button
+                          onClick={() => router.push(`/phone-calls/${call.id}/edit`)}
+                          className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4 text-gray-300" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(call.id)}
+                          className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-      </main>
+
+        {filteredCalls.length === 0 && (
+          <div className="text-center py-12">
+            <Phone className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-300 mb-2">Arama Bulunamadı</h3>
+            <p className="text-gray-400">Arama kriterlerinize uygun arama bulunamadı.</p>
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }

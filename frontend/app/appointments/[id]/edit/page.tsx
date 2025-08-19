@@ -22,7 +22,8 @@ export default function EditAppointmentPage() {
     employee_id: '',
     appointment_date: '',
     appointment_time: '',
-    notes: ''
+    notes: '',
+    status: 'scheduled'
   })
   
   // Available data
@@ -64,7 +65,8 @@ export default function EditAppointmentPage() {
           employee_id: appointmentData.employee_id,
           appointment_date: appointmentDate.toISOString().split('T')[0],
           appointment_time: appointmentDate.toTimeString().slice(0, 5),
-          notes: appointmentData.notes || ''
+          notes: appointmentData.notes || '',
+          status: appointmentData.status || 'scheduled'
         })
       }
 
@@ -194,17 +196,18 @@ export default function EditAppointmentPage() {
     try {
       const appointmentDateTime = new Date(`${formData.appointment_date}T${formData.appointment_time}`)
       
-      const result = await supabase
-        .from('appointments')
-        .update({
-          customer_id: formData.customer_id,
-          service_id: formData.service_id,
-          employee_id: formData.employee_id,
-          start_time: appointmentDateTime.toISOString(),
-          notes: formData.notes
-        })
-        .eq('id', appointmentId)
-        .select()
+              const result = await supabase
+          .from('appointments')
+          .update({
+            customer_id: formData.customer_id,
+            service_id: formData.service_id,
+            employee_id: formData.employee_id,
+            start_time: appointmentDateTime.toISOString(),
+            notes: formData.notes,
+            status: formData.status
+          })
+          .eq('id', appointmentId)
+          .select()
 
       if (result.data) {
         alert('Randevu başarıyla güncellendi!')
@@ -376,6 +379,40 @@ export default function EditAppointmentPage() {
                   {availableEmployees.length} çalışan bulundu
                 </p>
               )}
+            </div>
+
+            {/* Status Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Durum
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="scheduled">Planlandı</option>
+                <option value="completed">Tamamlandı</option>
+                <option value="cancelled">İptal Edildi</option>
+              </select>
+              <div className="mt-2 flex gap-2">
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  formData.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  Planlandı
+                </span>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  formData.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  Tamamlandı
+                </span>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  formData.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  İptal Edildi
+                </span>
+              </div>
             </div>
 
             {/* Notes */}

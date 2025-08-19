@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Settings, ArrowLeft, Save } from 'lucide-react'
 import { auth, db } from '@/lib/supabase'
+import { capitalizeName } from '@/lib/utils'
 
 export default function NewServicePage() {
   const router = useRouter()
@@ -38,6 +39,18 @@ export default function NewServicePage() {
       setLoading(false)
     }
   }
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const capitalizedValue = capitalizeName(value);
+    setFormData(prev => ({ ...prev, name: capitalizedValue }));
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const capitalizedValue = capitalizeName(value);
+    setFormData(prev => ({ ...prev, description: capitalizedValue }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,7 +131,7 @@ export default function NewServicePage() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={handleNameChange}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Örn: Saç Kesimi, Manikür, Saç Boyama"
                 required
@@ -165,7 +178,7 @@ export default function NewServicePage() {
               </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={handleDescriptionChange}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Hizmet hakkında detaylı açıklama..."
                 rows={4}

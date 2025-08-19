@@ -1,5 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Yardımcı fonksiyon: İsimleri baş harfi büyük yapar
+const capitalizeName = (name: string | null | undefined): string => {
+  if (!name) return ''
+  
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jsffwpsldfrtlyezeezc.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzZmZ3cHNsZGZydGx5ZXplZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNDE3NDcsImV4cCI6MjA3MDYxNzc0N30.1r7KTob1ismyIUCDnhiyzqvIVhz7YWK8lsrw1WpDIdA'
 
@@ -111,6 +122,122 @@ export const db = {
         whatsappCount: 0,
         phoneCount: 0
       }
+    }
+  },
+
+  // Son aktiviteler
+  getRecentActivities: async (userId: string) => {
+    try {
+      const { data: salonProfile } = await db.getSalonProfile(userId)
+      if (!salonProfile) {
+        return { data: [], error: null }
+      }
+
+      // Son randevular - müşteri bilgileriyle birlikte
+      const { data: recentAppointments } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          start_time,
+          status,
+          created_at,
+          customer_id,
+          customers(name),
+          services(name),
+          employees(name)
+        `)
+        .eq('salon_id', salonProfile.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      // Son müşteriler
+      const { data: recentCustomers } = await supabase
+        .from('customers')
+        .select('id, name, created_at')
+        .eq('salon_id', salonProfile.id)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      // Son çalışanlar
+      const { data: recentEmployees } = await supabase
+        .from('employees')
+        .select('id, name, created_at')
+        .eq('salon_id', salonProfile.id)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      // Aktiviteleri birleştir ve sırala
+      const activities: any[] = []
+
+      // Randevuları ekle - müşterinin kaçıncı randevusu olduğunu hesapla
+      if (recentAppointments) {
+        for (const appointment of recentAppointments) {
+          if (appointment.customer_id) {
+            // Bu müşterinin toplam randevu sayısını hesapla
+            const { data: customerAppointments } = await supabase
+              .from('appointments')
+              .select('id')
+              .eq('customer_id', appointment.customer_id)
+              .eq('salon_id', salonProfile.id)
+              .order('created_at', { ascending: true })
+
+            const appointmentNumber = (customerAppointments?.findIndex((a: any) => a.id === appointment.id) ?? -1) + 1
+            const totalAppointments = customerAppointments?.length || 1
+
+            let title = ''
+            if (appointmentNumber === 1) {
+              title = `${capitalizeName((appointment.customers as any)?.name) || 'Müşteri'} ilk randevusunu aldı`
+            } else {
+              title = `${capitalizeName((appointment.customers as any)?.name) || 'Müşteri'} ${appointmentNumber}. randevusunu aldı`
+            }
+
+            activities.push({
+              id: appointment.id,
+              type: 'appointment',
+              title: title,
+              description: `${capitalizeName((appointment.services as any)?.name) || 'Hizmet'} - ${capitalizeName((appointment.employees as any)?.name) || 'Atanmamış'}`,
+              date: appointment.created_at,
+              status: appointment.status,
+              appointmentNumber: appointmentNumber,
+              totalAppointments: totalAppointments
+            })
+          }
+        }
+      }
+
+      // Müşterileri ekle
+      if (recentCustomers) {
+        recentCustomers.forEach((customer: any) => {
+          activities.push({
+            id: customer.id,
+            type: 'customer',
+            title: `Yeni müşteri eklendi`,
+            description: capitalizeName(customer.name),
+            date: customer.created_at
+          })
+        })
+      }
+
+      // Çalışanları ekle
+      if (recentEmployees) {
+        recentEmployees.forEach((employee: any) => {
+          activities.push({
+            id: employee.id,
+            type: 'employee',
+            title: `Yeni çalışan eklendi`,
+            description: capitalizeName(employee.name),
+            date: employee.created_at
+          })
+        })
+      }
+
+      // Tarihe göre sırala (en yeni önce)
+      activities.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+      return { data: activities.slice(0, 5), error: null }
+    } catch (error) {
+      console.error('Error getting recent activities:', error)
+      return { data: [], error }
     }
   },
 
@@ -264,7 +391,8 @@ export const db = {
         .select(`
           *,
           customers(name, phone),
-          services(name, duration, price)
+          services(name, duration, price),
+          employees(name, position)
         `)
         .eq('salon_id', salonProfile.id)
         .order('start_time', { ascending: true })
@@ -290,7 +418,8 @@ export const db = {
           employee_id: appointmentData.employee_id,
           start_time: appointmentData.appointment_date,
           end_time: appointmentData.appointment_date, // Will be calculated based on service duration
-          notes: appointmentData.notes
+          notes: appointmentData.notes,
+          status: appointmentData.status || 'scheduled'
         }])
         .select()
     } catch (error) {
@@ -332,6 +461,56 @@ export const db = {
     } catch (error) {
       console.error('Error getting appointment by id:', error)
       return { data: null, error }
+    }
+  },
+
+  // Çalışanın belirli bir tarihteki randevularını al
+  getAppointmentsByEmployeeAndDate: async (userId: string, employeeId: string, date: string) => {
+    try {
+      const { data: salonProfile } = await db.getSalonProfile(userId)
+      if (!salonProfile) {
+        return { data: [], error: null }
+      }
+      
+      return await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customers(name, phone),
+          services(name, duration, price)
+        `)
+        .eq('employee_id', employeeId)
+        .eq('salon_id', salonProfile.id)
+        .gte('start_time', `${date}T00:00:00`)
+        .lt('start_time', `${date}T23:59:59`)
+        .order('start_time', { ascending: true })
+    } catch (error) {
+      console.error('Error getting appointments by employee and date:', error)
+      return { data: [], error }
+    }
+  },
+
+  // Çalışanın tüm randevularını al
+  getAppointmentsByEmployee: async (userId: string, employeeId: string) => {
+    try {
+      const { data: salonProfile } = await db.getSalonProfile(userId)
+      if (!salonProfile) {
+        return { data: [], error: null }
+      }
+      
+      return await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customers(name, phone),
+          services(name, duration, price)
+        `)
+        .eq('employee_id', employeeId)
+        .eq('salon_id', salonProfile.id)
+        .order('start_time', { ascending: false })
+    } catch (error) {
+      console.error('Error getting appointments by employee:', error)
+      return { data: [], error }
     }
   },
 

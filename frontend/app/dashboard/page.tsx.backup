@@ -46,17 +46,6 @@ interface ChartData {
   colors: string[];
 }
 
-interface AppointmentNotification {
-  id: string;
-  customerName: string;
-  serviceName: string;
-  employeeName: string;
-  appointmentTime: string;
-  appointmentDate: string;
-  status: string;
-  salonId: string;
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -79,13 +68,10 @@ export default function DashboardPage() {
   const [showQuickCustomer, setShowQuickCustomer] = useState(false);
   const [showQuickEmployee, setShowQuickEmployee] = useState(false);
   const [showQuickService, setShowQuickService] = useState(false);
-  const [showEarningsModal, setShowEarningsModal] = useState(false);
-  const [appointmentNotifications, setAppointmentNotifications] = useState<AppointmentNotification[]>([]);
 
   const [weeklyData, setWeeklyData] = useState<ChartData>({ labels: [], data: [], colors: [] });
   const [serviceData, setServiceData] = useState<ChartData>({ labels: [], data: [], colors: [] });
   const [customers, setCustomers] = useState<any[]>([]);
-  const [customerEarnings, setCustomerEarnings] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
@@ -177,8 +163,7 @@ export default function DashboardPage() {
           loadRecentActivities(profile.id),
           loadNotifications(profile.id),
           loadChartData(profile.id),
-          loadQuickAppointmentData(profile.id),
-          loadAppointmentNotifications(profile.id)
+          loadQuickAppointmentData(profile.id)
         ]);
       }
     } catch (error) {
@@ -497,89 +482,9 @@ export default function DashboardPage() {
         data: serviceData,
         colors: serviceColors.slice(0, serviceLabels.length)
       });
+
     } catch (error) {
       console.error('Error loading chart data:', error);
-    }
-  };
-
-  const loadAppointmentNotifications = async (salonId: string) => {
-    try {
-      // Bugün ve yarın için randevuları al
-      const today = new Date();
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      
-      const { data: upcomingAppointments } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          start_time,
-          status,
-          customers(name),
-          services(name),
-          employees(name)
-        `)
-        .eq('salon_id', salonId)
-        .in('status', ['confirmed', 'pending'])
-        .gte('start_time', today.toISOString().split('T')[0])
-        .lt('start_time', tomorrow.toISOString().split('T')[0])
-        .order('start_time', { ascending: true });
-
-      const notifications: AppointmentNotification[] = [];
-
-      upcomingAppointments?.forEach((apt: any) => {
-        const appointmentTime = new Date(apt.start_time);
-        const now = new Date();
-        const timeDiff = appointmentTime.getTime() - now.getTime();
-        const hoursUntilAppointment = timeDiff / (1000 * 60 * 60);
-
-        // Sadece 2 saat içinde başlayacak randevuları göster
-        if (hoursUntilAppointment >= 0 && hoursUntilAppointment <= 2) {
-          notifications.push({
-            id: apt.id,
-            customerName: apt.customers?.name || 'Bilinmeyen Müşteri',
-            serviceName: apt.services?.name || 'Bilinmeyen Hizmet',
-            employeeName: apt.employees?.name || 'Bilinmeyen Çalışan',
-            appointmentTime: appointmentTime.toLocaleTimeString('tr-TR', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }),
-            appointmentDate: appointmentTime.toLocaleDateString('tr-TR'),
-            status: apt.status,
-            salonId: salonId
-          });
-        }
-      });
-
-      setAppointmentNotifications(notifications);
-    } catch (error) {
-      console.error('Error loading appointment notifications:', error);
-    }
-  };
-
-  const handleAppointmentConfirm = async (appointmentId: string) => {
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'completed' })
-        .eq('id', appointmentId);
-
-      if (error) {
-        console.error('Error confirming appointment:', error);
-        return;
-      }
-
-      // Bildirimi listeden kaldır
-      setAppointmentNotifications(prev => 
-        prev.filter(notification => notification.id !== appointmentId)
-      );
-
-      // İstatistikleri yenile
-      if (user) {
-        await loadDashboardData(user.id);
-      }
-    } catch (error) {
-      console.error('Error confirming appointment:', error);
     }
   };
 
@@ -594,76 +499,8 @@ export default function DashboardPage() {
       setCustomers(customersRes.data || []);
       setServices(servicesRes.data || []);
       setEmployees(employeesRes.data || []);
-      
-      // Müşteri kazanç verilerini yükle
-      await loadCustomerEarnings(salonId);
     } catch (error) {
       console.error('Error loading quick appointment data:', error);
-    }
-  };
-
-  const loadCustomerEarnings = async (salonId: string) => {
-    try {
-      // Müşteri bazlı randevu ve kazanç verilerini al
-      const { data: appointments } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          customer_id,
-          service_id,
-          start_time,
-          status,
-          customers(name),
-          services(name, price)
-        `)
-        .eq('salon_id', salonId)
-        .eq('status', 'completed');
-
-      if (appointments) {
-        // Müşteri bazlı verileri grupla
-        const customerStats: { [key: string]: any } = {};
-        
-        appointments.forEach((appointment: any) => {
-          const customerId = appointment.customer_id;
-          const customerName = appointment.customers?.name || 'Bilinmeyen Müşteri';
-          const servicePrice = (appointment.services as any)?.price || 0;
-          const appointmentDate = new Date(appointment.start_time);
-
-          if (!customerStats[customerId]) {
-            customerStats[customerId] = {
-              id: customerId,
-              name: customerName,
-              totalAppointments: 0,
-              totalEarnings: 0,
-              lastAppointment: null,
-              averageEarnings: 0
-            };
-          }
-
-          customerStats[customerId].totalAppointments += 1;
-          customerStats[customerId].totalEarnings += servicePrice;
-          
-          if (!customerStats[customerId].lastAppointment || 
-              appointmentDate > new Date(customerStats[customerId].lastAppointment)) {
-            customerStats[customerId].lastAppointment = appointment.start_time;
-          }
-        });
-
-        // Ortalama kazançları hesapla
-        Object.values(customerStats).forEach((customer: any) => {
-          customer.averageEarnings = customer.totalAppointments > 0 
-            ? customer.totalEarnings / customer.totalAppointments 
-            : 0;
-        });
-
-        // Kazanca göre sırala
-        const sortedCustomers = Object.values(customerStats)
-          .sort((a: any, b: any) => b.totalEarnings - a.totalEarnings);
-
-        setCustomerEarnings(sortedCustomers);
-      }
-    } catch (error) {
-      console.error('Error loading customer earnings:', error);
     }
   };
 
@@ -1138,18 +975,15 @@ export default function DashboardPage() {
             </div>
           </button>
 
-          <button 
-            onClick={() => setShowEarningsModal(true)}
-            className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:bg-gray-800/70 transition-all duration-300 cursor-pointer group"
-          >
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
             <div className="flex flex-col items-center text-center">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center mb-4 shadow-lg">
                 <DollarSign className="w-7 h-7 text-white" />
               </div>
               <div className="text-3xl font-bold text-white mb-1">{stats.todayEarnings} ₺</div>
               <div className="text-gray-400 text-sm">Bugünkü Kazanç</div>
             </div>
-          </button>
+          </div>
         </div>
 
 
@@ -1211,7 +1045,9 @@ export default function DashboardPage() {
                     <p className="text-gray-400">Henüz aktivite yok</p>
                   </div>
                 )}
-                 </div>
+              </div>
+            </div>
+          </div>
 
           {/* Quick Actions */}
           <div className="lg:col-span-1">
@@ -1383,176 +1219,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* Earnings Statistics Modal */}
-      {showEarningsModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold text-white">Kazanç İstatistikleri</h2>
-              <button
-                onClick={() => setShowEarningsModal(false)}
-                className="text-gray-400 hover:text-white text-xl"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              {/* Bugünkü İstatistikler */}
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-emerald-400" />
-                  Bugün
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Toplam Kazanç:</span>
-                    <span className="text-white font-semibold">{stats.todayEarnings} ₺</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Randevu Sayısı:</span>
-                    <span className="text-white font-semibold">{stats.todayAppointments}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Ortalama:</span>
-                    <span className="text-white font-semibold">
-                      {stats.todayAppointments > 0 ? (stats.todayEarnings / stats.todayAppointments).toFixed(2) : 0} ₺
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bu Hafta İstatistikler */}
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-blue-400" />
-                  Bu Hafta
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Toplam Kazanç:</span>
-                    <span className="text-white font-semibold">{stats.thisMonthEarnings} ₺</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Randevu Sayısı:</span>
-                    <span className="text-white font-semibold">{stats.thisWeekAppointments}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Ortalama:</span>
-                    <span className="text-white font-semibold">
-                      {stats.thisWeekAppointments > 0 ? (stats.thisMonthEarnings / stats.thisWeekAppointments).toFixed(2) : 0} ₺
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bu Ay İstatistikler */}
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-purple-400" />
-                  Bu Ay
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Toplam Kazanç:</span>
-                    <span className="text-white font-semibold">{stats.thisMonthEarnings} ₺</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Randevu Sayısı:</span>
-                    <span className="text-white font-semibold">{stats.totalAppointments}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Ortalama:</span>
-                    <span className="text-white font-semibold">
-                      {stats.totalAppointments > 0 ? (stats.thisMonthEarnings / stats.totalAppointments).toFixed(2) : 0} ₺
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Hizmet Bazlı Kazanç Dağılımı */}
-            <div className="bg-gray-700/50 rounded-lg p-4 mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-orange-400" />
-                Hizmet Bazlı Kazanç Dağılımı
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {serviceData.labels.map((service, index) => (
-                  <div key={service} className="bg-gray-600/50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white font-medium text-sm">{service}</span>
-                      <div 
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: serviceData.colors[index] }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-300">Randevu:</span>
-                      <span className="text-white">{serviceData.data[index]}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-300">Oran:</span>
-                      <span className="text-white">
-                        {((serviceData.data[index] / serviceData.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Müşteri Bazlı Kazanç Analizi */}
-            <div className="bg-gray-700/50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-green-400" />
-                Müşteri Bazlı Kazanç Analizi
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-600">
-                      <th className="text-left py-2 text-gray-300">Müşteri</th>
-                      <th className="text-left py-2 text-gray-300">Toplam Randevu</th>
-                      <th className="text-left py-2 text-gray-300">Toplam Kazanç</th>
-                      <th className="text-left py-2 text-gray-300">Ortalama</th>
-                      <th className="text-left py-2 text-gray-300">Son Randevu</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customerEarnings.length > 0 ? (
-                      customerEarnings.slice(0, 10).map((customer: any) => (
-                        <tr key={customer.id} className="border-b border-gray-700/50 hover:bg-gray-600/30">
-                          <td className="py-2 text-white">{customer.name}</td>
-                          <td className="py-2 text-gray-300">{customer.totalAppointments}</td>
-                          <td className="py-2 text-gray-300">{customer.totalEarnings.toFixed(2)} ₺</td>
-                          <td className="py-2 text-gray-300">{customer.averageEarnings.toFixed(2)} ₺</td>
-                          <td className="py-2 text-gray-300">
-                            {customer.lastAppointment 
-                              ? new Date(customer.lastAppointment).toLocaleDateString('tr-TR')
-                              : 'Henüz randevu yok'
-                            }
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="py-4 text-center text-gray-400">
-                          Henüz tamamlanmış randevu bulunmuyor
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-gray-400 mt-3">
-                * Sadece tamamlanmış randevular gösterilmektedir. En çok kazandıran müşteriler üstte listelenir.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Quick Appointment Modal */}
       {showQuickAppointment && (
@@ -2053,69 +1719,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Appointment Notifications */}
-      {appointmentNotifications.length > 0 && (
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-sm border border-orange-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white flex items-center">
-                <Clock className="w-5 h-5 mr-2 text-orange-400" />
-                Yaklaşan Randevular
-              </h2>
-              <span className="text-sm text-orange-300 bg-orange-500/20 px-2 py-1 rounded-full">
-                {appointmentNotifications.length} randevu
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {appointmentNotifications.map((notification) => (
-                <div key={notification.id} className="bg-gray-800/50 border border-orange-500/30 rounded-lg p-4 hover:bg-gray-800/70 transition-all duration-300">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className="text-white font-semibold text-sm mb-1">
-                        {notification.customerName}
-                      </h3>
-                      <p className="text-gray-300 text-xs mb-1">
-                        {notification.serviceName}
-                      </p>
-                      <p className="text-gray-400 text-xs">
-                        {notification.employeeName}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-orange-400 font-bold text-sm">
-                        {notification.appointmentTime}
-                      </div>
-                      <div className="text-gray-400 text-xs">
-                        {notification.appointmentDate}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      notification.status === 'confirmed' 
-                        ? 'bg-green-500/20 text-green-300' 
-                        : 'bg-yellow-500/20 text-yellow-300'
-                    }`}>
-                      {notification.status === 'confirmed' ? 'Onaylandı' : 'Beklemede'}
-                    </span>
-                    <button
-                      onClick={() => handleAppointmentConfirm(notification.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded-lg transition-colors"
-                    >
-                      Tamamlandı
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recent Activities and Quick Actions */}
-        </div>
-      </div>
     </div>
+  </div>
   );
 }

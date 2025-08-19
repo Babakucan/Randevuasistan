@@ -14,10 +14,25 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<any>(null)
   const [appointments, setAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
 
   useEffect(() => {
     checkUser()
   }, [customerId])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.profile-menu')) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const checkUser = async () => {
     try {
@@ -72,25 +87,16 @@ export default function CustomerDetailPage() {
     }
   }
 
-  const handleSignOut = async () => {
-    try {
-      await auth.signOut()
-      router.push('/')
-    } catch (err) {
-      console.error('Sign out error:', err)
-    }
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-600/20 text-blue-300 border border-blue-600/30'
       case 'completed':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-600/20 text-green-300 border border-green-600/30'
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-600/20 text-red-300 border border-red-600/30'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-600/20 text-gray-300 border border-gray-600/30'
     }
   }
 
@@ -116,12 +122,10 @@ export default function CustomerDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #e0f2fe)' }}>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Yükleniyor...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-white rounded-full animate-spin"></div>
+          <span className="text-gray-300">Yükleniyor...</span>
         </div>
       </div>
     )
@@ -129,49 +133,89 @@ export default function CustomerDetailPage() {
 
   if (!customer) {
     return (
-      <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #e0f2fe)' }}>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <p className="text-gray-600">Müşteri bulunamadı</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-300">Müşteri bulunamadı</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #e0f2fe)' }}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => router.push('/customers')}
-                className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
+                className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Müşterilere Dön</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Müşteriler</span>
               </button>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">Müşteri Detayı</span>
-              </div>
+              <span className="text-gray-400">|</span>
+              <h1 className="text-2xl font-bold text-white">Müşteri Detayı</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-600">
-                <User className="w-4 h-4" />
-                <span>{user?.email}</span>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
+            
+            {/* Profile Menu */}
+            <div className="relative profile-menu">
+              <button 
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="flex items-center space-x-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
               >
-                <LogOut className="w-4 h-4" />
-                <span>Çıkış Yap</span>
+                <Users className="w-5 h-5 text-gray-300" />
               </button>
+              
+              {/* Profile Dropdown */}
+              {showProfileMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                  <div className="py-2">
+                    <div className="px-4 py-2 border-b border-gray-700">
+                      <div className="text-sm text-gray-300">{user?.email}</div>
+                      <div className="text-xs text-gray-500">Yönetici</div>
+                    </div>
+                    <button
+                      onClick={() => router.push('/dashboard')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                    >
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={() => router.push('/appointments')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                    >
+                      Randevular
+                    </button>
+                    <button
+                      onClick={() => router.push('/customers')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                    >
+                      Müşteriler
+                    </button>
+                    <button
+                      onClick={() => router.push('/services')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                    >
+                      Hizmetler
+                    </button>
+                    <div className="border-t border-gray-700 mt-2 pt-2">
+                      <button
+                        onClick={async () => {
+                          await auth.signOut();
+                          router.push('/login');
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
+                      >
+                        Çıkış Yap
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -180,24 +224,24 @@ export default function CustomerDetailPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Customer Info Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-8 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
             <div className="flex items-center space-x-6">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                <Users className="w-10 h-10 text-green-600" />
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                <Users className="w-10 h-10 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{customer.name}</h1>
+                <h1 className="text-3xl font-bold text-white">{customer.name}</h1>
                 <div className="flex items-center space-x-6 mt-2">
-                  <div className="flex items-center space-x-2 text-gray-600">
+                  <div className="flex items-center space-x-2 text-gray-300">
                     <Phone className="w-4 h-4" />
                     <span>{customer.phone || 'Telefon yok'}</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-gray-600">
+                  <div className="flex items-center space-x-2 text-gray-300">
                     <Mail className="w-4 h-4" />
                     <span>{customer.email || 'E-posta yok'}</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-gray-600">
+                  <div className="flex items-center space-x-2 text-gray-300">
                     <Clock className="w-4 h-4" />
                     <span>Kayıt: {new Date(customer.created_at).toLocaleDateString('tr-TR')}</span>
                   </div>
@@ -207,14 +251,14 @@ export default function CustomerDetailPage() {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => router.push(`/customers/${customerId}/edit`)}
-                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-300"
               >
                 <Edit className="w-4 h-4" />
                 <span>Düzenle</span>
               </button>
               <button
                 onClick={() => router.push(`/appointments/new?customer=${customerId}`)}
-                className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+                className="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg transition-all duration-300"
               >
                 <Calendar className="w-4 h-4" />
                 <span>Yeni Randevu</span>
@@ -225,96 +269,96 @@ export default function CustomerDetailPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Randevu</p>
-                <p className="text-2xl font-bold text-gray-900">{appointments.length}</p>
+                <p className="text-sm font-medium text-gray-400">Toplam Randevu</p>
+                <p className="text-2xl font-bold text-white">{appointments.length}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 bg-blue-600/20 rounded-lg flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-blue-400" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Tamamlanan</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-gray-400">Tamamlanan</p>
+                <p className="text-2xl font-bold text-white">
                   {appointments.filter(a => a.status === 'completed').length}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-green-600" />
+              <div className="w-12 h-12 bg-green-600/20 rounded-lg flex items-center justify-center">
+                <Users className="w-6 h-6 text-green-400" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Harcama</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-gray-400">Toplam Harcama</p>
+                <p className="text-2xl font-bold text-white">
                   {formatCurrency(appointments.reduce((total, a) => total + (a.services?.price || 0), 0))}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">₺</span>
+              <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                <span className="text-2xl text-purple-400">₺</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Appointments Table */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">Randevu Geçmişi</h2>
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-700">
+            <h2 className="text-xl font-bold text-white">Randevu Geçmişi</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-700/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Hizmet
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Tarih & Saat
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Durum
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Fiyat
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     İşlemler
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-700">
                 {appointments.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                       Henüz randevu bulunmuyor.
                     </td>
                   </tr>
                 ) : (
-                                     appointments.map((appointment) => (
-                     <tr 
-                       key={appointment.id} 
-                       className="hover:bg-gray-50 cursor-pointer transition-colors"
-                       onClick={() => router.push(`/appointments/${appointment.id}`)}
-                     >
+                  appointments.map((appointment) => (
+                    <tr 
+                      key={appointment.id} 
+                      className="hover:bg-gray-700/30 cursor-pointer transition-colors"
+                      onClick={() => router.push(`/appointments/${appointment.id}`)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{appointment.services?.name}</div>
-                        <div className="text-sm text-gray-500">{appointment.services?.duration} dk</div>
+                        <div className="text-sm font-medium text-white">{appointment.services?.name}</div>
+                        <div className="text-sm text-gray-400">{appointment.services?.duration} dk</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-white">
                           {new Date(appointment.appointment_date).toLocaleDateString('tr-TR')}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-400">
                           {new Date(appointment.appointment_date).toLocaleTimeString('tr-TR', { 
                             hour: '2-digit', 
                             minute: '2-digit' 
@@ -326,14 +370,17 @@ export default function CustomerDetailPage() {
                           {getStatusText(appointment.status)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         {formatCurrency(appointment.services?.price || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
                           <button 
-                            onClick={() => router.push(`/appointments/${appointment.id}`)}
-                            className="text-blue-600 hover:text-blue-900"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/appointments/${appointment.id}`);
+                            }}
+                            className="text-blue-400 hover:text-blue-300"
                           >
                             Görüntüle
                           </button>

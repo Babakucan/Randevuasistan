@@ -325,6 +325,7 @@ Randevuasistan, kuaför salonlarının telefon ve WhatsApp üzerinden gelen rand
 
 ### 11.7 Sayfa Geliştirmeleri
 - [x] **Dashboard**: İstatistik kartları, hızlı işlemler, sistem durumu
+- [x] **Dashboard Kazanç İstatistikleri**: Tıklanabilir kazanç kartı, detaylı müşteri bazlı kazanç analizi
 - [x] **Müşteriler**: Müşteri listesi, arama/filtreleme, tıklanabilir satırlar
 - [x] **Müşteri Detay**: Müşteri bilgileri, randevu geçmişi, tıklanabilir randevular
 - [x] **Randevular**: Randevu listesi, arama/filtreleme, tıklanabilir satırlar
@@ -381,6 +382,13 @@ Randevuasistan, kuaför salonlarının telefon ve WhatsApp üzerinden gelen rand
   - [ ] Otomatik arama karşılama
   - [ ] Sesli randevu oluşturma
   - [ ] Call recording sistemi
+
+- [ ] **Randevu Bildirimleri Sistemi**
+  - [ ] Zamanı gelen randevular için kart bildirimleri
+  - [ ] Otomatik randevu takibi
+  - [ ] Onaylandığında kart kaybolma
+  - [ ] Gerçek zamanlı bildirimler
+  - [ ] Dashboard entegrasyonu
 
 ### 12.2 Gelişmiş Özellikler (Öncelik: Orta)
 - [ ] **Müşteri Portalı**
@@ -561,5 +569,5 @@ AI entegrasyonu ile otomatik randevu oluşturma sistemi geliştirmek ve WhatsApp
 ---
 
 *Bu PRD dokümanı, projenin gelişimi sürecinde güncellenebilir ve revize edilebilir.*
-*Son Güncelleme: [13.08.2025] - Hatalar Düzeltildi*
-*Versiyon: 2.1*
+*Son Güncelleme: [13.12.2024] - Dashboard Kazanç İstatistikleri Eklendi*
+*Versiyon: 2.2*

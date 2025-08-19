@@ -1,321 +1,563 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Calendar, Users, MessageCircle, Phone, LogOut, User, ArrowLeft, Plus, Search, Edit, Trash2, Clock } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { capitalizeName } from '@/lib/utils';
+import { 
+  Calendar, 
+  Plus, 
+  Search, 
+  Eye, 
+  Edit, 
+  Trash2,
+  Clock,
+  User,
+  Settings,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  LogOut
+} from 'lucide-react';
+
+interface Appointment {
+  id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  notes: string;
+  created_at: string;
+  customers: {
+    name: string;
+    phone: string;
+  } | null;
+  employees: {
+    name: string;
+  } | null;
+  services: {
+    name: string;
+    price: number;
+  } | null;
+}
 
 export default function AppointmentsPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [appointments, setAppointments] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>('all');
+  const itemsPerPage = 10;
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
-    checkUser()
-  }, [])
+    checkUser();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedDateFilter, searchTerm]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.profile-menu')) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const checkUser = async () => {
     try {
-      const { data: sessionData } = await auth.getSession()
-      
-      if (sessionData.session) {
-        setUser(sessionData.session.user)
-        await loadAppointments(sessionData.session.user.id)
-      } else {
-        const { user: currentUser } = await auth.getCurrentUser()
-        if (currentUser) {
-          setUser(currentUser)
-          await loadAppointments(currentUser.id)
-        } else {
-          router.push('/login')
-          return
-        }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
       }
-    } catch (err) {
-      console.error('Auth check error:', err)
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
-      setLoading(false)
+      setUser(user);
+      await loadAppointments(user.id);
+    } catch (error) {
+      console.error('Error checking user:', error);
+      router.push('/login');
     }
-  }
+  };
 
   const loadAppointments = async (userId: string) => {
     try {
-      const { data, error } = await db.getAppointments(userId)
-      if (error) {
-        console.error('Error loading appointments:', error)
-      } else {
-        setAppointments(data || [])
+      const { data: profile } = await supabase
+        .from('salon_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (profile) {
+        const { data: appointmentsData } = await supabase
+          .from('appointments')
+          .select(`
+            id,
+            start_time,
+            end_time,
+            status,
+            notes,
+            created_at,
+            customers(name, phone),
+            employees(name),
+            services(name, price)
+          `)
+          .eq('salon_id', profile.id)
+          .order('start_time', { ascending: false });
+
+        if (appointmentsData) {
+          setAppointments(appointmentsData as unknown as Appointment[]);
+          setTotalPages(Math.ceil(appointmentsData.length / itemsPerPage));
+        }
       }
     } catch (error) {
-      console.error('Error loading appointments:', error)
+      console.error('Error loading appointments:', error);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  const handleSignOut = async () => {
-    try {
-      await auth.signOut()
-      router.push('/')
-    } catch (err) {
-      console.error('Sign out error:', err)
+  const filteredAppointments = appointments.filter(appointment => {
+    // Arama filtresi
+    const searchMatch = 
+      capitalizeName(appointment.customers?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      capitalizeName(appointment.employees?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      capitalizeName(appointment.services?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      appointment.customers?.phone?.includes(searchTerm);
+
+    // Gün filtresi
+    if (selectedDateFilter === 'all') {
+      return searchMatch;
     }
-  }
+
+    const appointmentDate = new Date(appointment.start_time);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    let dateMatch = false;
+    switch (selectedDateFilter) {
+      case 'today':
+        dateMatch = appointmentDate.toDateString() === today.toDateString();
+        break;
+      case 'tomorrow':
+        dateMatch = appointmentDate.toDateString() === tomorrow.toDateString();
+        break;
+      case 'this-week':
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        dateMatch = appointmentDate >= startOfWeek && appointmentDate <= endOfWeek;
+        break;
+      case 'next-week':
+        const nextWeekStart = new Date(nextWeek);
+        nextWeekStart.setDate(nextWeek.getDate() - nextWeek.getDay());
+        const nextWeekEnd = new Date(nextWeekStart);
+        nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+        dateMatch = appointmentDate >= nextWeekStart && appointmentDate <= nextWeekEnd;
+        break;
+      case 'past':
+        dateMatch = appointmentDate < today;
+        break;
+      default:
+        dateMatch = true;
+    }
+
+    return searchMatch && dateMatch;
+  });
+
+  const paginatedAppointments = filteredAppointments.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handleDelete = async (appointmentId: string) => {
+    if (!confirm('Bu randevuyu silmek istediğinizden emin misiniz?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      setAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
+      alert('Randevu başarıyla silindi!');
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      alert('Randevu silinirken hata oluştu.');
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800'
       case 'completed':
-        return 'bg-green-100 text-green-800'
+        return 'text-emerald-400';
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'text-blue-400';
     }
-  }
+  };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'scheduled':
-        return 'Planlandı'
       case 'completed':
-        return 'Tamamlandı'
+        return 'Tamamlandı';
       case 'cancelled':
-        return 'İptal Edildi'
+        return 'İptal Edildi';
       default:
-        return status
+        return 'Planlandı';
     }
-  }
+  };
 
-  const handleEditAppointment = (appointmentId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    router.push(`/appointments/${appointmentId}/edit`)
-  }
-
-  const handleDeleteAppointment = async (appointmentId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    if (confirm('Bu randevuyu silmek istediğinizden emin misiniz?')) {
-      try {
-        const { error } = await db.deleteAppointment(appointmentId)
-        if (error) {
-          console.error('Error deleting appointment:', error)
-          alert('Randevu silinirken hata oluştu.')
-        } else {
-          alert('Randevu başarıyla silindi.')
-          // Randevuları yeniden yükle
-          if (user) {
-            await loadAppointments(user.id)
-          }
-        }
-      } catch (error) {
-        console.error('Error deleting appointment:', error)
-        alert('Randevu silinirken hata oluştu.')
-      }
-    }
-  }
-
-  const filteredAppointments = appointments.filter(appointment =>
-    appointment.customers?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    appointment.services?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    appointment.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const formatDateTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #e0f2fe)' }}>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Yükleniyor...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-white rounded-full animate-spin"></div>
+          <span className="text-gray-300">Yükleniyor...</span>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #e0f2fe)' }}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => router.push('/dashboard')}
-                className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
+                className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Dashboard'a Dön</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Dashboard</span>
               </button>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">Randevular</span>
-              </div>
+              <span className="text-gray-400">|</span>
+              <h1 className="text-2xl font-bold text-white">Randevular</h1>
+              <span className="text-gray-400">|</span>
+              <span className="text-gray-300">Toplam {appointments.length} randevu</span>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-600">
-                <User className="w-4 h-4" />
-                <span>{user?.email}</span>
-              </div>
               <button
-                onClick={handleSignOut}
-                className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
+                onClick={() => router.push('/appointments/new')}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg transition-all duration-300"
               >
-                <LogOut className="w-4 h-4" />
-                <span>Çıkış Yap</span>
+                <Plus className="w-4 h-4" />
+                <span>Yeni Randevu</span>
               </button>
+              
+              {/* Profile Menu */}
+              <div className="relative profile-menu">
+                <button 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center space-x-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                >
+                  <User className="w-5 h-5 text-gray-300" />
+                </button>
+                
+                {/* Profile Dropdown */}
+                {showProfileMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                    <div className="py-2">
+                      <div className="px-4 py-2 border-b border-gray-700">
+                        <div className="text-sm text-gray-300">{user?.email}</div>
+                        <div className="text-xs text-gray-500">Yönetici</div>
+                      </div>
+                      <button
+                        onClick={() => router.push('/dashboard')}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        Dashboard
+                      </button>
+                      <button
+                        onClick={() => router.push('/employees')}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        Çalışanlar
+                      </button>
+                      <button
+                        onClick={() => router.push('/customers')}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        Müşteriler
+                      </button>
+                      <button
+                        onClick={() => router.push('/services')}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        Hizmetler
+                      </button>
+                      <div className="border-t border-gray-700 mt-2 pt-2">
+                        <button
+                          onClick={async () => {
+                            await supabase.auth.signOut();
+                            router.push('/login');
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
+                        >
+                          Çıkış Yap
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Randevu Listesi</h1>
-              <p className="text-gray-600">Toplam {appointments.length} randevu</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Randevu ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <button
-                onClick={() => router.push('/appointments/new')}
-                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Yeni Randevu</span>
-              </button>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Randevu ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+            />
+          </div>
+        </div>
+
+        {/* Date Filter */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setSelectedDateFilter('all')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+                selectedDateFilter === 'all'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+              }`}
+            >
+              Tümü
+            </button>
+            <button
+              onClick={() => setSelectedDateFilter('today')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+                selectedDateFilter === 'today'
+                  ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg'
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+              }`}
+            >
+              Bugün
+            </button>
+            <button
+              onClick={() => setSelectedDateFilter('tomorrow')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+                selectedDateFilter === 'tomorrow'
+                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+              }`}
+            >
+              Yarın
+            </button>
+            <button
+              onClick={() => setSelectedDateFilter('this-week')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+                selectedDateFilter === 'this-week'
+                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg'
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+              }`}
+            >
+              Bu Hafta
+            </button>
+            <button
+              onClick={() => setSelectedDateFilter('next-week')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+                selectedDateFilter === 'next-week'
+                  ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg'
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+              }`}
+            >
+              Gelecek Hafta
+            </button>
+            <button
+              onClick={() => setSelectedDateFilter('past')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+                selectedDateFilter === 'past'
+                  ? 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg'
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+              }`}
+            >
+              Geçmiş
+            </button>
+          </div>
+          
+          {/* Filter Summary */}
+          <div className="mt-3 text-sm text-gray-400">
+            {selectedDateFilter !== 'all' && (
+              <span>
+                Filtrelenmiş: {filteredAppointments.length} randevu bulundu
+                {filteredAppointments.length !== appointments.length && (
+                  <span className="text-gray-500"> (toplam {appointments.length} randevudan)</span>
+                )}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Appointments Table */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-700/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Müşteri
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Müşteri & Hizmet
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Hizmet
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Çalışan
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Tarih & Saat
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Durum
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Notlar
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     İşlemler
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAppointments.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                      {searchTerm ? 'Arama sonucu bulunamadı.' : 'Henüz randevu bulunmuyor.'}
+              <tbody className="divide-y divide-gray-700">
+                {paginatedAppointments.map((appointment) => (
+                  <tr key={appointment.id} className="hover:bg-gray-700/30 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                          <Calendar className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-white">
+                            {capitalizeName(appointment.customers?.name || 'Bilinmeyen Müşteri')}
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {capitalizeName(appointment.services?.name || 'Bilinmeyen Hizmet')}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {appointment.customers?.phone || 'Telefon yok'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                          <User className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="ml-2 text-sm text-gray-300">
+                          {capitalizeName(appointment.employees?.name || 'Bilinmeyen Çalışan')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">
+                        {formatDateTime(appointment.start_time)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {appointment.services?.price || 0} ₺
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
+                        {getStatusText(appointment.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => router.push(`/appointments/${appointment.id}`)}
+                          className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                        >
+                          <Eye className="w-4 h-4 text-gray-300" />
+                        </button>
+                        <button
+                          onClick={() => router.push(`/appointments/${appointment.id}/edit`)}
+                          className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4 text-gray-300" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(appointment.id)}
+                          className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ) : (
-                                     filteredAppointments.map((appointment) => (
-                     <tr 
-                       key={appointment.id} 
-                       className="hover:bg-gray-50 cursor-pointer transition-colors"
-                       onClick={() => router.push(`/appointments/${appointment.id}`)}
-                     >
-                       <td className="px-6 py-4 whitespace-nowrap">
-                         <div 
-                           className="flex items-center"
-                           onClick={(e) => {
-                             e.stopPropagation()
-                             router.push(`/customers/${appointment.customer_id}`)
-                           }}
-                         >
-                           <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                             <Users className="w-5 h-5 text-green-600" />
-                           </div>
-                           <div className="ml-4">
-                             <div className="text-sm font-medium text-gray-900 hover:text-blue-600">
-                               {appointment.customers?.name}
-                             </div>
-                             <div className="text-sm text-gray-500">{appointment.customers?.phone}</div>
-                           </div>
-                         </div>
-                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{appointment.services?.name}</div>
-                        <div className="text-sm text-gray-500">{appointment.services?.duration} dk</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {new Date(appointment.appointment_date).toLocaleDateString('tr-TR')}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(appointment.appointment_date).toLocaleTimeString('tr-TR', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(appointment.status)}`}>
-                          {getStatusText(appointment.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                        {appointment.notes || '-'}
-                      </td>
-                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                         <div 
-                           className="flex items-center space-x-2"
-                           onClick={(e) => e.stopPropagation()}
-                         >
-                           <button 
-                             className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
-                             onClick={(e) => handleEditAppointment(appointment.id, e)}
-                           >
-                             <Edit className="w-4 h-4" />
-                           </button>
-                           <button 
-                             className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                             onClick={(e) => handleDeleteAppointment(appointment.id, e)}
-                           >
-                             <Trash2 className="w-4 h-4" />
-                           </button>
-                         </div>
-                       </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-      </main>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-sm text-gray-400">
+              Sayfa {currentPage} / {totalPages}
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-lg transition-colors"
+              >
+                Önceki
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-lg transition-colors"
+              >
+                Sonraki
+              </button>
+            </div>
+          </div>
+        )}
+
+        {filteredAppointments.length === 0 && (
+          <div className="text-center py-12">
+            <Calendar className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-300 mb-2">Randevu Bulunamadı</h3>
+            <p className="text-gray-400">Arama kriterlerinize uygun randevu bulunamadı.</p>
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }

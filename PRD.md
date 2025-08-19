@@ -2,10 +2,10 @@
 
 ## 📋 Proje Özeti
 
-**Proje Adı:** Salon Yönetim Sistemi  
+**Proje Adı:** Sevim Kuaför Salon Yönetim Sistemi  
 **Versiyon:** 1.0  
 **Tarih:** 2024  
-**Durum:** Tamamlandı ✅
+**Durum:** Geliştirme Aşamasında 🔄
 
 ### 🎯 Proje Amacı
 Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek, randevu yönetimini kolaylaştırmak ve müşteri deneyimini iyileştirmek için kapsamlı bir web uygulaması geliştirmek.
@@ -20,14 +20,20 @@ Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek, rande
 - **State Management:** React Hooks
 
 ### Backend
+- **Framework:** Node.js + Express.js
+- **Dil:** TypeScript
 - **Database:** Supabase (PostgreSQL)
-- **Authentication:** Supabase Auth
-- **API:** Supabase Client
+- **Authentication:** Supabase Auth + JWT
+- **API:** RESTful API
 - **Security:** Row Level Security (RLS)
+- **AI Integration:** OpenAI API
+- **Automation:** n8n Integration
 
 ### Hosting & Deployment
 - **Frontend:** Vercel (önerilen)
+- **Backend:** Railway/Heroku/Vercel
 - **Database:** Supabase Cloud
+- **Automation:** n8n Cloud/Self-hosted
 
 ## 📊 Veritabanı Şeması
 
@@ -99,9 +105,8 @@ Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek, rande
 - customer_id (UUID, Foreign Key)
 - employee_id (UUID, Foreign Key)
 - service_id (UUID, Foreign Key)
-- appointment_date (DATE)
-- appointment_time (TIME)
-- duration (INTEGER)
+- start_time (TIMESTAMP)
+- end_time (TIMESTAMP)
 - status (VARCHAR)
 - notes (TEXT)
 - created_at (TIMESTAMP)
@@ -118,180 +123,271 @@ Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek, rande
 - created_at (TIMESTAMP)
 ```
 
+#### 7. `ai_conversations`
+```sql
+- id (UUID, Primary Key)
+- salon_id (UUID, Foreign Key)
+- customer_phone (VARCHAR)
+- platform (VARCHAR)
+- status (VARCHAR)
+- conversation_data (JSONB)
+- created_at (TIMESTAMP)
+- updated_at (TIMESTAMP)
+```
+
+#### 8. `notifications`
+```sql
+- id (UUID, Primary Key)
+- salon_id (UUID, Foreign Key)
+- type (VARCHAR)
+- title (VARCHAR)
+- message (TEXT)
+- is_read (BOOLEAN)
+- created_at (TIMESTAMP)
+```
+
 ## 🎨 Kullanıcı Arayüzü
 
 ### Tasarım Prensipleri
-- **Renk Paleti:** Gri ve siyah tonları (gradient)
+- **Renk Paleti:** Siyah-gri gradient arka plan (from-gray-900 via-gray-800 to-black)
+- **Kart Tasarımı:** Yarı şeffaf gri arka planlar (bg-gray-800/50) glassmorphism
+- **İkonlar:** Soft renk tonları (text-gray-300/400)
 - **Tipografi:** Modern, okunabilir fontlar
 - **Responsive:** Mobil uyumlu tasarım
 - **UX:** Sezgisel navigasyon ve hızlı işlemler
 
 ### Sayfa Yapısı
 
-#### 1. **Dashboard** (`/dashboard`)
+#### 1. **Dashboard** (`/dashboard`) ✅
 - Salon genel bakış
 - Günlük randevular
-- Hızlı istatistikler
+- Hızlı istatistikler (5 kart)
+- Hızlı işlemler menüsü
+- Son aktiviteler
+- Sistem durumu
 - Navigasyon menüsü
 
-#### 2. **Çalışan Yönetimi** (`/employees`)
+#### 2. **Çalışan Yönetimi** (`/employees`) ✅
 - Çalışan listesi (grid görünümü)
 - Çalışan ekleme (`/employees/new`)
 - Çalışan düzenleme (`/employees/[id]/edit`)
 - Çalışan detayları (`/employees/[id]`)
-- İzin günleri yönetimi
-- Çalışma saatleri ayarlama
-- Hizmet atama
+- Bugünkü randevu sayısı
+- Bugünkü kazanç bilgisi
+- Randevu görüntüleme modalı
 
-#### 3. **Hizmet Yönetimi** (`/services`)
-- Hizmet listesi
+#### 3. **Hizmet Yönetimi** (`/services`) ✅
+- Hizmet listesi (grid görünümü)
 - Hizmet ekleme (`/services/new`)
 - Hizmet düzenleme (`/services/[id]/edit`)
 - Hizmet detayları (`/services/[id]`)
 
-#### 4. **Müşteri Yönetimi** (`/customers`)
+#### 4. **Müşteri Yönetimi** (`/customers`) ✅
 - Müşteri listesi (tablo görünümü)
 - Müşteri ekleme (`/customers/new`)
 - Müşteri düzenleme (`/customers/[id]/edit`)
 - Müşteri detayları (`/customers/[id]`)
 
-#### 5. **Randevu Yönetimi** (`/appointments`)
+#### 5. **Randevu Yönetimi** (`/appointments`) ✅
 - Randevu listesi (tablo görünümü)
 - Randevu oluşturma (`/appointments/new`)
 - Randevu düzenleme (`/appointments/[id]/edit`)
 - Randevu detayları (`/appointments/[id]`)
+- Durum değiştirme dropdown'u
+- Sayfalama sistemi
+
+#### 6. **Telefon Aramaları** (`/phone-calls`) ✅
+- Arama listesi (tablo görünümü)
+- Arama detayları (`/phone-calls/[id]`)
+
+#### 7. **WhatsApp Mesajları** (`/whatsapp`) ✅
+- Mesaj listesi (tablo görünümü)
+- Mesaj detayları (`/whatsapp/[id]`)
+
+#### 8. **AI Konuşmaları** (`/ai-conversations`) 🔄
+- AI konuşma geçmişi
+- Konuşma analizi
+- Sentiment analizi
+
+#### 9. **Bildirimler** (`/notifications`) 🔄
+- Sistem bildirimleri
+- Randevu hatırlatıcıları
+- Okunmamış bildirim sayısı
 
 ## 🔧 Temel Özellikler
 
-### 1. **Kimlik Doğrulama**
+### 1. **Kimlik Doğrulama** ✅
 - Email/şifre ile giriş
 - Otomatik salon profili oluşturma
 - Güvenli oturum yönetimi
+- Otomatik yönlendirme
 
-### 2. **Çalışan Yönetimi**
+### 2. **Çalışan Yönetimi** ✅
 - Çalışan ekleme/düzenleme/silme
-- İzin günleri takibi
-- Çalışma saatleri yönetimi
-- Hizmet atama sistemi
-- Deneyim ve uzmanlık alanları
+- Uzmanlık alanları
+- İletişim bilgileri
+- Biyografi
+- Bugünkü performans takibi
 
-### 3. **Hizmet Yönetimi**
+### 3. **Hizmet Yönetimi** ✅
 - Hizmet ekleme/düzenleme/silme
 - Fiyat ve süre belirleme
-- Kategori sistemi
+- Açıklama sistemi
 - Aktif/pasif durumu
 
-### 4. **Müşteri Yönetimi**
+### 4. **Müşteri Yönetimi** ✅
 - Müşteri ekleme/düzenleme/silme
 - İletişim bilgileri
 - Müşteri notları
 - Arama ve filtreleme
 
-### 5. **Randevu Sistemi**
-- Akıllı randevu oluşturma
-- Çalışan müsaitlik kontrolü
-- Hizmet bazlı çalışan filtreleme
-- İzin günleri kontrolü
-- Çalışma saatleri kontrolü
+### 5. **Randevu Sistemi** ✅
+- Randevu oluşturma
 - Randevu düzenleme/silme
+- Durum yönetimi (Planlandı, Tamamlandı, İptal Edildi)
+- Müşteri, çalışan ve hizmet ilişkilendirme
+- Notlar sistemi
 
-### 6. **Arama ve Filtreleme**
+### 6. **Arama ve Filtreleme** ✅
 - Tüm listelerde arama
-- Tarih bazlı filtreleme
-- Durum bazlı filtreleme
+- Gerçek zamanlı filtreleme
+- Sayfalama sistemi
+
+### 7. **AI Entegrasyonu** 🔄
+- OpenAI API entegrasyonu
+- Otomatik müşteri yanıtları
+- Randevu önerileri
+- Sentiment analizi
+
+### 8. **Bildirim Sistemi** 🔄
+- Otomatik randevu hatırlatıcıları
+- Sistem bildirimleri
+- Email/SMS entegrasyonu (gelecek)
 
 ## 🚀 Gelişmiş Özellikler
 
-### 1. **Akıllı Randevu Sistemi**
-- Otomatik çalışan önerisi
-- Çakışma kontrolü
-- Müsaitlik kontrolü
-- İzin günleri kontrolü
+### 1. **Modern UI/UX Tasarım** ✅
+- Glassmorphism efektleri
+- Soft renk paleti
+- Responsive tasarım
+- Hover animasyonları
+- Loading states
 
-### 2. **Çalışan İzin Yönetimi**
-- Günlük izin takibi
-- JSONB tabanlı esnek yapı
-- Görsel izin göstergeleri
+### 2. **Dashboard İstatistikleri** ✅
+- Toplam randevu sayısı
+- Toplam müşteri sayısı
+- Telefon arama sayısı
+- WhatsApp mesaj sayısı
+- Çalışan sayısı
+- Haftalık randevu grafiği
+- Hizmet dağılımı grafiği
+- Bu hafta randevu sayısı
+- Bu ay kazanç toplamı
 
-### 3. **Hizmet Atama Sistemi**
-- Çalışan-hizmet ilişkilendirme
-- Özel fiyatlandırma
-- Müsaitlik kontrolü
+### 3. **Çalışan Performans Takibi** ✅
+- Bugünkü randevu sayısı
+- Bugünkü kazanç hesaplama
+- Randevu geçmişi görüntüleme
 
-### 4. **Responsive Tasarım**
+### 4. **Responsive Tasarım** ✅
 - Mobil uyumlu arayüz
 - Tablet optimizasyonu
 - Desktop deneyimi
+- Grid ve tablo görünümleri
+
+### 5. **Gelişmiş Dashboard Özellikleri** ✅
+- Hızlı randevu oluşturma modalı
+- Gerçek zamanlı istatistikler
+- Tıklanabilir kartlar
+- Profil menüsü
+- Son aktiviteler (tüm tablolardan)
+- Müşteri geçmişi görünümü
+
+### 6. **n8n Otomasyon Entegrasyonu** 🔄
+- Workflow otomasyonları
+- Webhook entegrasyonları
+- Otomatik randevu hatırlatıcıları
+- Müşteri takip otomasyonları
+- Raporlama otomasyonları
 
 ## 🔒 Güvenlik
 
-### 1. **Row Level Security (RLS)**
+### 1. **Row Level Security (RLS)** ✅
 - Salon bazlı veri izolasyonu
 - Kullanıcı bazlı erişim kontrolü
 - Güvenli veri paylaşımı
 
-### 2. **Authentication**
+### 2. **Authentication** ✅
 - Supabase Auth entegrasyonu
 - Güvenli oturum yönetimi
 - Otomatik yönlendirme
 
-### 3. **Data Validation**
+### 3. **Data Validation** ✅
 - Form validasyonu
 - Veri bütünlüğü kontrolü
 - SQL injection koruması
 
 ## 📱 Kullanıcı Deneyimi
 
-### 1. **Hızlı İşlemler**
-- Tek tıkla randevu oluşturma
+### 1. **Hızlı İşlemler** ✅
+- Tek tıkla sayfa geçişleri
 - Hızlı arama
-- Otomatik tamamlama
+- Modal pencereler
+- Hızlı randevu oluşturma
+- Tıklanabilir dashboard kartları
 
-### 2. **Görsel Geri Bildirim**
+### 2. **Görsel Geri Bildirim** ✅
 - Loading animasyonları
 - Başarı/hata mesajları
 - Hover efektleri
+- Scale animasyonları
 
-### 3. **Sezgisel Navigasyon**
+### 3. **Sezgisel Navigasyon** ✅
 - Breadcrumb navigasyonu
 - Hızlı erişim butonları
 - Tutarlı tasarım dili
+- Geri dönüş butonları
+- Profil menüsü ile kolay navigasyon
 
 ## 🧪 Test Senaryoları
 
-### 1. **Kimlik Doğrulama Testleri**
+### 1. **Kimlik Doğrulama Testleri** ✅
 - Giriş yapma
 - Çıkış yapma
 - Oturum kontrolü
 - Salon profili oluşturma
 
-### 2. **CRUD İşlemleri**
+### 2. **CRUD İşlemleri** ✅
 - Çalışan ekleme/düzenleme/silme
 - Hizmet ekleme/düzenleme/silme
 - Müşteri ekleme/düzenleme/silme
 - Randevu oluşturma/düzenleme/silme
 
-### 3. **Randevu Sistemi Testleri**
-- Çalışan müsaitlik kontrolü
-- İzin günleri kontrolü
-- Çakışma kontrolü
-- Hizmet bazlı filtreleme
+### 3. **Randevu Sistemi Testleri** ✅
+- Randevu oluşturma
+- Durum değiştirme
+- Müşteri, çalışan ve hizmet ilişkilendirme
 
-### 4. **Arama ve Filtreleme**
+### 4. **Arama ve Filtreleme** ✅
 - Müşteri arama
 - Çalışan arama
-- Tarih filtreleme
-- Durum filtreleme
+- Hizmet arama
+- Randevu arama
+
+### 5. **AI ve Otomasyon Testleri** 🔄
+- AI konuşma işleme
+- n8n workflow testleri
+- Webhook entegrasyonları
 
 ## 📈 Performans
 
-### 1. **Optimizasyonlar**
+### 1. **Optimizasyonlar** ✅
 - Lazy loading
 - Image optimization
 - Code splitting
 - Caching stratejileri
 
-### 2. **Database Optimizasyonu**
+### 2. **Database Optimizasyonu** ✅
 - İndeksler
 - Query optimizasyonu
 - Connection pooling
@@ -308,23 +404,34 @@ Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek, rande
 - Çalışan performans analizi
 - Müşteri analitikleri
 
-### 3. **Entegrasyonlar**
+### 3. **Entegrasyonlar** 🔄
 - SMS/Email bildirimleri
 - Ödeme sistemi
 - Takvim entegrasyonu
+- WhatsApp Business API
+- Twilio entegrasyonu
 
-### 4. **AI Özellikleri**
+### 4. **AI Özellikleri** 🔄
 - Akıllı randevu önerileri
 - Müşteri davranış analizi
 - Otomatik fiyatlandırma
+- Sentiment analizi
+- Otomatik müşteri yanıtları
+
+### 5. **n8n Otomasyonları** 🔄
+- Otomatik randevu hatırlatıcıları
+- Müşteri takip otomasyonları
+- Raporlama otomasyonları
+- Sosyal medya entegrasyonları
+- CRM entegrasyonları
 
 ## 🛠️ Kurulum ve Deployment
 
-### 1. **Geliştirme Ortamı**
+### 1. **Frontend Geliştirme Ortamı**
 ```bash
 # Repository klonlama
 git clone [repository-url]
-cd salon-yonetim-sistemi
+cd salon-yonetim-sistemi/frontend
 
 # Bağımlılıkları yükleme
 npm install
@@ -336,61 +443,115 @@ cp .env.example .env.local
 npm run dev
 ```
 
-### 2. **Production Deployment**
+### 2. **Backend Geliştirme Ortamı**
 ```bash
-# Build
-npm run build
+cd backend
 
-# Deploy (Vercel)
-vercel --prod
+# Bağımlılıkları yükleme
+npm install
+
+# Environment değişkenleri
+cp .env.example .env
+
+# Geliştirme sunucusu
+npm run dev
 ```
 
-### 3. **Database Setup**
+### 3. **n8n Kurulumu**
+```bash
+# Global kurulum
+npm install -g n8n
+
+# n8n başlatma
+n8n start
+```
+
+### 4. **Production Deployment**
+```bash
+# Frontend Build
+cd frontend
+npm run build
+
+# Backend Build
+cd backend
+npm run build
+
+# Deploy (Vercel/Railway)
+vercel --prod
+railway up
+```
+
+### 5. **Database Setup**
 - Supabase projesi oluşturma
 - SQL scriptlerini çalıştırma
 - RLS politikalarını ayarlama
+- AI ve notification tablolarını oluşturma
 
 ## 📝 Dokümantasyon
 
-### 1. **API Dokümantasyonu**
+### 1. **API Dokümantasyonu** ✅
+- Backend REST API dokümantasyonu
 - Supabase client fonksiyonları
 - Database şeması
 - RLS politikaları
+- n8n entegrasyon rehberi
 
-### 2. **Kullanıcı Kılavuzu**
+### 2. **Kullanıcı Kılavuzu** ✅
 - Sistem kullanımı
 - Özellik açıklamaları
 - Sık sorulan sorular
+- n8n workflow kullanımı
+- AI özellikleri rehberi
 
-### 3. **Geliştirici Kılavuzu**
+### 3. **Geliştirici Kılavuzu** ✅
 - Kod yapısı
 - Katkı rehberi
 - Test stratejileri
+- Backend API geliştirme
+- n8n workflow geliştirme
 
 ## 🎯 Başarı Kriterleri
 
-### 1. **Fonksiyonel Gereksinimler**
+### 1. **Fonksiyonel Gereksinimler** ✅
 - ✅ Tüm CRUD işlemleri çalışıyor
 - ✅ Randevu sistemi aktif
 - ✅ Çalışan yönetimi tamamlandı
 - ✅ Müşteri yönetimi aktif
+- ✅ Hizmet yönetimi aktif
+- ✅ Dashboard istatistikleri çalışıyor
+- 🔄 Backend API geliştirildi
+- 🔄 AI entegrasyonu hazır
+- 🔄 n8n kurulumu tamamlandı
 
-### 2. **Performans Kriterleri**
+### 2. **Performans Kriterleri** ✅
 - ✅ Sayfa yükleme süresi < 2 saniye
 - ✅ Responsive tasarım
 - ✅ Cross-browser uyumluluk
 
-### 3. **Güvenlik Kriterleri**
+### 3. **Güvenlik Kriterleri** ✅
 - ✅ RLS politikaları aktif
 - ✅ Authentication sistemi
 - ✅ Data validation
 
+### 4. **UI/UX Kriterleri** ✅
+- ✅ Modern glassmorphism tasarım
+- ✅ Soft renk paleti
+- ✅ Tutarlı ikonlar ve yazı tipleri
+- ✅ Hover ve animasyon efektleri
+- ✅ Mobil uyumlu tasarım
+
+### 5. **Teknik Kriterleri** 🔄
+- 🔄 Backend API performansı
+- 🔄 AI entegrasyonu testleri
+- 🔄 n8n workflow testleri
+- 🔄 Güvenlik testleri
+
 ## 📞 İletişim
 
-**Geliştirici:** [Geliştirici Adı]  
-**Email:** [Email Adresi]  
+**Geliştirici:** [Anıl Yazıcı]  
+**Email:** [Anilyazici1238@gmail.com]  
 **GitHub:** [GitHub Profili]
 
 ---
 
-*Bu doküman salon yönetim sisteminin tam özelliklerini ve teknik detaylarını içermektedir. Güncellemeler ve değişiklikler için lütfen iletişime geçin.*
+*Bu doküman Sevim Kuaför Salon Yönetim Sistemi'nin tam özelliklerini ve teknik detaylarını içermektedir. Güncellemeler ve değişiklikler için lütfen iletişime geçin.*

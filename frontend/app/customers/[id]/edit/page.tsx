@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Users, ArrowLeft, Save } from 'lucide-react'
 import { auth, db, supabase } from '@/lib/supabase'
+import { capitalizeName } from '@/lib/utils'
 
 export default function EditCustomerPage() {
   const router = useRouter()
@@ -59,6 +60,12 @@ export default function EditCustomerPage() {
       console.error('Error loading data:', error)
     }
   }
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const capitalizedValue = capitalizeName(value);
+    setFormData(prev => ({ ...prev, name: capitalizedValue }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,7 +152,7 @@ export default function EditCustomerPage() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={handleNameChange}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Müşteri adı ve soyadı"
                 required
