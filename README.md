@@ -1,4 +1,4 @@
-# 🏪 Salon Yönetim Sistemi
+# 🏪 Randevu Asistan - Salon Yönetim Sistemi
 
 Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek için geliştirilmiş kapsamlı web uygulaması.
 
@@ -36,6 +36,18 @@ Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek için 
 - Çalışma saatleri kontrolü
 - Randevu düzenleme/silme
 
+### 🤖 AI Entegrasyonu
+- OpenAI API entegrasyonu
+- Otomatik müşteri yanıtları
+- Randevu önerileri
+- Sentiment analizi
+
+### 🔄 n8n Otomasyonları
+- Workflow otomasyonları
+- Webhook entegrasyonları
+- Otomatik randevu hatırlatıcıları
+- Müşteri takip otomasyonları
+
 ### 🔍 Arama ve Filtreleme
 - Tüm listelerde arama
 - Tarih bazlı filtreleme
@@ -50,13 +62,20 @@ Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek için 
 - **Lucide React** - İkonlar
 
 ### Backend
+- **Node.js + Express.js** - REST API
+- **TypeScript** - Backend tip güvenliği
 - **Supabase** - Backend as a Service
 - **PostgreSQL** - Veritabanı
 - **Row Level Security (RLS)** - Güvenlik
+- **OpenAI API** - AI entegrasyonu
+
+### Automation
+- **n8n** - Workflow otomasyonları
 
 ### Deployment
 - **Vercel** - Frontend hosting
-- **Supabase Cloud** - Backend hosting
+- **Railway/Heroku** - Backend hosting
+- **Supabase Cloud** - Database hosting
 
 ## 🚀 Kurulum
 
@@ -64,44 +83,60 @@ Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek için 
 - Node.js 18+ 
 - npm veya yarn
 - Supabase hesabı
+- OpenAI API key (opsiyonel)
+- n8n (opsiyonel)
 
 ### 1. Repository Klonlama
 ```bash
-git clone https://github.com/kullaniciadi/salon-yonetim-sistemi.git
-cd salon-yonetim-sistemi
+git clone https://github.com/Babakucan/Randevuasistan.git
+cd Randevuasistan
 ```
 
-### 2. Bağımlılıkları Yükleme
+### 2. Frontend Kurulumu
 ```bash
+cd frontend
 npm install
-# veya
-yarn install
-```
-
-### 3. Environment Değişkenleri
-```bash
 cp .env.example .env.local
+npm run dev
 ```
 
-`.env.local` dosyasını düzenleyin:
+### 3. Backend Kurulumu
+```bash
+cd backend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+### 4. n8n Kurulumu (Opsiyonel)
+```bash
+npm install -g n8n
+n8n start
+```
+
+### 5. Environment Değişkenleri
+
+**Frontend (.env.local):**
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-### 4. Veritabanı Kurulumu
+**Backend (.env):**
+```env
+PORT=3001
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+OPENAI_API_KEY=your_openai_api_key
+JWT_SECRET=your_jwt_secret
+```
+
+### 6. Veritabanı Kurulumu
 1. [Supabase](https://supabase.com) hesabı oluşturun
 2. Yeni proje oluşturun
 3. SQL Editor'de `supabase-schema.sql` dosyasını çalıştırın
-
-### 5. Geliştirme Sunucusu
-```bash
-npm run dev
-# veya
-yarn dev
-```
-
-Uygulama [http://localhost:3000](http://localhost:3000) adresinde çalışacak.
+4. AI ve notification tablolarını oluşturun
 
 ## 📊 Veritabanı Şeması
 
@@ -112,6 +147,8 @@ Uygulama [http://localhost:3000](http://localhost:3000) adresinde çalışacak.
 - `customers` - Müşteri bilgileri
 - `appointments` - Randevu bilgileri
 - `employee_services` - Çalışan-hizmet ilişkileri
+- `ai_conversations` - AI konuşma geçmişi
+- `notifications` - Sistem bildirimleri
 
 Detaylı şema için [PRD.md](./PRD.md) dosyasına bakın.
 
@@ -121,13 +158,16 @@ Detaylı şema için [PRD.md](./PRD.md) dosyasına bakın.
 - **Renk Paleti:** Gri ve siyah tonları (gradient)
 - **Responsive:** Mobil uyumlu tasarım
 - **UX:** Sezgisel navigasyon
+- **Glassmorphism:** Modern görsel efektler
 
 ### Sayfa Yapısı
-- **Dashboard** - Genel bakış
+- **Dashboard** - Genel bakış ve istatistikler
 - **Çalışanlar** - Çalışan yönetimi
 - **Hizmetler** - Hizmet yönetimi
 - **Müşteriler** - Müşteri yönetimi
 - **Randevular** - Randevu yönetimi
+- **AI Konuşmaları** - AI entegrasyonu
+- **Bildirimler** - Sistem bildirimleri
 
 ## 🔒 Güvenlik
 
@@ -138,8 +178,9 @@ Detaylı şema için [PRD.md](./PRD.md) dosyasına bakın.
 
 ### Authentication
 - Supabase Auth entegrasyonu
+- JWT token sistemi
 - Güvenli oturum yönetimi
-- Otomatik yönlendirme
+- Rate limiting
 
 ## 📱 Responsive Tasarım
 
@@ -162,26 +203,37 @@ Uygulama tüm cihazlarda mükemmel çalışır:
    - Müşteri ekleme/düzenleme/silme
    - Randevu oluşturma/düzenleme/silme
 
-3. **Randevu Sistemi**
-   - Çalışan müsaitlik kontrolü
-   - İzin günleri kontrolü
-   - Hizmet bazlı filtreleme
+3. **AI ve Otomasyon**
+   - AI konuşma işleme
+   - n8n workflow testleri
+   - Webhook entegrasyonları
 
 ## 🚀 Deployment
 
-### Vercel ile Deployment
+### Frontend (Vercel)
 ```bash
-# Build
+cd frontend
 npm run build
-
-# Deploy
 vercel --prod
 ```
 
+### Backend (Railway/Heroku)
+```bash
+cd backend
+npm run build
+railway up
+# veya
+heroku create
+git push heroku main
+```
+
 ### Environment Variables
-Vercel'de şu environment variables'ları ayarlayın:
+Production'da şu environment variables'ları ayarlayın:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `JWT_SECRET`
 
 ## 📈 Performans
 
@@ -190,6 +242,7 @@ Vercel'de şu environment variables'ları ayarlayın:
 - Image optimization
 - Code splitting
 - Caching stratejileri
+- Rate limiting
 
 ### Database Optimizasyonu
 - İndeksler
@@ -203,7 +256,8 @@ Vercel'de şu environment variables'ları ayarlayın:
 - 📊 Gelişmiş raporlama
 - 💬 SMS/Email bildirimleri
 - 💳 Ödeme sistemi entegrasyonu
-- 🤖 AI destekli özellikler
+- 🤖 Gelişmiş AI özellikleri
+- 🔄 n8n workflow şablonları
 
 ## 🤝 Katkıda Bulunma
 
@@ -219,8 +273,8 @@ Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](./LI
 
 ## 📞 İletişim
 
-**Geliştirici:** [Geliştirici Adı]  
-**Email:** [Email Adresi]  
+**Geliştirici:** Anıl Yazıcı  
+**Email:** Anilyazici1238@gmail.com  
 **GitHub:** [GitHub Profili]
 
 ## 🙏 Teşekkürler
@@ -229,6 +283,8 @@ Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](./LI
 - [Supabase](https://supabase.com) - Backend as a Service
 - [Tailwind CSS](https://tailwindcss.com) - CSS framework
 - [Lucide](https://lucide.dev) - İkonlar
+- [OpenAI](https://openai.com) - AI API
+- [n8n](https://n8n.io) - Workflow automation
 
 ---
 
