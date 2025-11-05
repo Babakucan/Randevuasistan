@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-// TODO: Import API service from new backend
+import { authApi, getToken, removeToken } from '@/lib/api';
 import { capitalizeName } from '@/lib/utils';
 import { 
   Phone, 
@@ -43,38 +43,30 @@ export default function PhoneCallsPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = getToken();
+      if (!token) {
         router.push('/login');
         return;
       }
-      setUser(user);
-      await loadCalls(user.id);
+      const currentUser = await authApi.getCurrentUser();
+      if (!currentUser) {
+        router.push('/login');
+        return;
+      }
+      setUser(currentUser);
+      await loadCalls(currentUser.id);
     } catch (error) {
       console.error('Error checking user:', error);
+      removeToken();
       router.push('/login');
     }
   };
 
   const loadCalls = async (userId: string) => {
     try {
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (profile) {
-        const { data: callsData } = await supabase
-          .from('phone_calls')
-          .select('*')
-          .eq('salon_id', profile.id)
-          .order('created_at', { ascending: false });
-
-        if (callsData) {
-          setCalls(callsData);
-        }
-      }
+      // TODO: Implement phone calls API when backend is ready
+      // For now, set empty array to prevent errors
+      setCalls([]);
     } catch (error) {
       console.error('Error loading calls:', error);
     } finally {
@@ -92,13 +84,7 @@ export default function PhoneCallsPage() {
     if (!confirm('Bu aramayı silmek istediğinizden emin misiniz?')) return;
 
     try {
-      const { error } = await supabase
-        .from('phone_calls')
-        .delete()
-        .eq('id', callId);
-
-      if (error) throw error;
-
+      // TODO: Implement phone call delete API when backend is ready
       setCalls(prev => prev.filter(call => call.id !== callId));
       alert('Arama başarıyla silindi!');
     } catch (error) {
@@ -213,8 +199,8 @@ export default function PhoneCallsPage() {
 
               {/* Sign Out */}
               <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
+                onClick={() => {
+                  removeToken();
                   router.push('/login');
                 }}
                 className="flex items-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"

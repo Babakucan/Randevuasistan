@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Users, MessageCircle, Phone, LogOut, User, ArrowLeft, Edit, Trash2, Mail, Clock, MapPin, Send, Download } from 'lucide-react'
-// TODO: Import API service from new backend
+import { authApi, getToken, removeToken } from '@/lib/api'
 
 export default function WhatsAppMessageDetailPage() {
   const router = useRouter()
@@ -20,23 +20,21 @@ export default function WhatsAppMessageDetailPage() {
 
   const checkUser = async () => {
     try {
-      const { data: sessionData } = await auth.getSession()
-      
-      if (sessionData.session) {
-        setUser(sessionData.session.user)
-        await loadMessageData(sessionData.session.user.id)
-      } else {
-        const { user: currentUser } = await auth.getCurrentUser()
-        if (currentUser) {
-          setUser(currentUser)
-          await loadMessageData(currentUser.id)
-        } else {
-          router.push('/login')
-          return
-        }
+      const token = getToken()
+      if (!token) {
+        router.push('/login')
+        return
       }
+      const currentUser = await authApi.getCurrentUser()
+      if (!currentUser) {
+        router.push('/login')
+        return
+      }
+      setUser(currentUser)
+      await loadMessageData(currentUser.id)
     } catch (err) {
       console.error('Auth check error:', err)
+      removeToken()
       setTimeout(() => {
         router.push('/login')
       }, 2000)
@@ -47,13 +45,9 @@ export default function WhatsAppMessageDetailPage() {
 
   const loadMessageData = async (userId: string) => {
     try {
-      const { data, error } = await db.getWhatsAppMessageById(userId, messageId)
-      if (error) {
-        console.error('Error loading message:', error)
-        setMessage(null)
-      } else {
-        setMessage(data)
-      }
+      // TODO: Implement WhatsApp message API when backend is ready
+      // For now, set message to null to prevent errors
+      setMessage(null)
     } catch (error) {
       console.error('Error loading message:', error)
       setMessage(null)
@@ -62,8 +56,8 @@ export default function WhatsAppMessageDetailPage() {
 
   const handleSignOut = async () => {
     try {
-      await auth.signOut()
-      router.push('/')
+      removeToken()
+      router.push('/login')
     } catch (err) {
       console.error('Sign out error:', err)
     }

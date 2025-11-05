@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Users, MessageCircle, Phone, LogOut, User, ArrowLeft, Edit, Trash2, Mail, Clock, MapPin, Download } from 'lucide-react'
-// TODO: Import API service from new backend
+import { authApi, getToken, removeToken } from '@/lib/api'
 
 export default function PhoneCallDetailPage() {
   const router = useRouter()
@@ -21,23 +21,22 @@ export default function PhoneCallDetailPage() {
 
   const checkUser = async () => {
     try {
-      const { data: sessionData } = await auth.getSession()
-      
-      if (sessionData.session) {
-        setUser(sessionData.session.user)
-        await loadCallData(sessionData.session.user.id)
+      const token = getToken()
+      if (!token) {
+        router.push('/login')
+        return
+      }
+      const currentUser = await authApi.getCurrentUser()
+      if (currentUser) {
+        setUser(currentUser)
+        await loadCallData(currentUser.id)
       } else {
-        const { user: currentUser } = await auth.getCurrentUser()
-        if (currentUser) {
-          setUser(currentUser)
-          await loadCallData(currentUser.id)
-        } else {
-          router.push('/login')
-          return
-        }
+        router.push('/login')
+        return
       }
     } catch (err) {
       console.error('Auth check error:', err)
+      removeToken()
       setTimeout(() => {
         router.push('/login')
       }, 2000)
@@ -48,18 +47,10 @@ export default function PhoneCallDetailPage() {
 
   const loadCallData = async (userId: string) => {
     try {
-      const { data, error } = await db.getPhoneCallById(userId, callId)
-      if (error) {
-        console.error('Error loading call:', error)
-        setCall(null)
-      } else {
-        setCall(data)
-        // Konuşma geçmişi verilerini de yükle
-        if (data) {
-          const { data: historyData } = await db.getCallHistoryByPhone(userId, data.customer_phone)
-          setCallHistory(historyData)
-        }
-      }
+      // TODO: Implement phone call API when backend is ready
+      // For now, set call to null to prevent errors
+      setCall(null)
+      setCallHistory(null)
     } catch (error) {
       console.error('Error loading call:', error)
       setCall(null)
@@ -68,8 +59,8 @@ export default function PhoneCallDetailPage() {
 
   const handleSignOut = async () => {
     try {
-      await auth.signOut()
-      router.push('/')
+      removeToken()
+      router.push('/login')
     } catch (err) {
       console.error('Sign out error:', err)
     }

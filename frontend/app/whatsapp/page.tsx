@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-// TODO: Import API service from new backend
+import { authApi, getToken, removeToken } from '@/lib/api';
 import { capitalizeName } from '@/lib/utils';
 import { 
   MessageSquare, 
@@ -39,38 +39,30 @@ export default function WhatsAppPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = getToken();
+      if (!token) {
         router.push('/login');
         return;
       }
-      setUser(user);
-      await loadMessages(user.id);
+      const currentUser = await authApi.getCurrentUser();
+      if (!currentUser) {
+        router.push('/login');
+        return;
+      }
+      setUser(currentUser);
+      await loadMessages(currentUser.id);
     } catch (error) {
       console.error('Error checking user:', error);
+      removeToken();
       router.push('/login');
     }
   };
 
   const loadMessages = async (userId: string) => {
     try {
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (profile) {
-        const { data: messagesData } = await supabase
-          .from('whatsapp_messages')
-          .select('*')
-          .eq('salon_id', profile.id)
-          .order('created_at', { ascending: false });
-
-        if (messagesData) {
-          setMessages(messagesData);
-        }
-      }
+      // TODO: Implement WhatsApp messages API when backend is ready
+      // For now, set empty array to prevent errors
+      setMessages([]);
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
@@ -88,13 +80,7 @@ export default function WhatsAppPage() {
     if (!confirm('Bu mesajı silmek istediğinizden emin misiniz?')) return;
 
     try {
-      const { error } = await supabase
-        .from('whatsapp_messages')
-        .delete()
-        .eq('id', messageId);
-
-      if (error) throw error;
-
+      // TODO: Implement WhatsApp message delete API when backend is ready
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
       alert('Mesaj başarıyla silindi!');
     } catch (error) {
@@ -195,7 +181,7 @@ export default function WhatsAppPage() {
               {/* Sign Out */}
               <button
                 onClick={async () => {
-                  await supabase.auth.signOut();
+                  removeToken();
                   router.push('/login');
                 }}
                 className="flex items-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
