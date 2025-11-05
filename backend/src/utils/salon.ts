@@ -1,3 +1,4 @@
+import { SalonProfile } from '@prisma/client';
 import prisma from '../config/database';
 import { AppError } from '../middleware/error';
 
@@ -25,7 +26,7 @@ export async function getUserSalonProfile(
 
   // If salonId is provided, find that specific salon
   if (salonId) {
-    const salon = user.salonProfiles.find(sp => sp.id === salonId);
+    const salon = user.salonProfiles.find((sp: SalonProfile) => sp.id === salonId);
     if (!salon) {
       throw new AppError('Salon profile not found or access denied', 404);
     }

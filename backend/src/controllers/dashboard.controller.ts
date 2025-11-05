@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { Employee, Service, Customer, Appointment } from '@prisma/client';
 import prisma from '../config/database';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/error';
@@ -147,7 +148,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
 
     const activities: any[] = [];
 
-    recentAppointments.forEach((apt) => {
+    recentAppointments.forEach((apt: Appointment & { customer: Customer; service: Service; employee?: Employee | null }) => {
       activities.push({
         id: apt.id,
         type: 'appointment',
@@ -158,7 +159,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
       });
     });
 
-    recentCustomers.forEach((customer) => {
+    recentCustomers.forEach((customer: Customer) => {
       activities.push({
         id: customer.id,
         type: 'customer',
@@ -169,7 +170,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
       });
     });
 
-    recentEmployees.forEach((employee) => {
+    recentEmployees.forEach((employee: Employee) => {
       activities.push({
         id: employee.id,
         type: 'employee',
@@ -180,7 +181,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
       });
     });
 
-    recentServices.forEach((service) => {
+    recentServices.forEach((service: Service) => {
       activities.push({
         id: service.id,
         type: 'service',
