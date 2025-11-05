@@ -5,26 +5,27 @@ Tüm önemli değişiklikler bu dosyada dokümante edilmiştir.
 Format [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/) standardına göre,
 ve bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 
-## [2.1.0] - Planlanan - Temizlik ve Optimizasyon
+## [2.1.0] - 2025 - Temizlik ve Optimizasyon
 
 ### 🧹 Temizlik
-- Gereksiz SQL dosyalarının kaldırılması
-- Eski Supabase referanslarının temizlenmesi
-- Backup dosyalarının kaldırılması
-- Test dosyalarının düzenlenmesi
+- ✅ **36 SQL dosyası kaldırıldı** (V1'den kalan Supabase schema dosyaları)
+- ✅ **Eski Supabase dokümantasyon dosyaları kaldırıldı** (3 dosya)
+- ✅ **Backup dosyaları kaldırıldı** (page.tsx.backup)
+- ✅ **Geçici dosyalar temizlendi** (deneme.txt)
+- ✅ **Toplam 41 gereksiz dosya git'ten kaldırıldı**
 
 ### 🐛 Düzeltmeler
-- Çalışan düzenleme sayfası buton state yönetimi
-- Employee Service assignment endpoint implementasyonu
-- Phone Calls sayfası migration
-- WhatsApp sayfası migration
+- ⚠️ Çalışan düzenleme sayfası buton state yönetimi (bekliyor)
+- ⚠️ Employee Service assignment endpoint implementasyonu (bekliyor)
+- ⚠️ Phone Calls sayfası migration (bekliyor)
+- ⚠️ WhatsApp sayfası migration (bekliyor)
 
 ### 📝 Dokümantasyon
-- ARCHITECTURE.md eklendi
-- V2_ROADMAP.md eklendi
-- CHANGELOG.md eklendi
-- DEPLOYMENT.md eklenecek
-- README.md güncellendi
+- ✅ ARCHITECTURE.md eklendi
+- ✅ V2_ROADMAP.md eklendi
+- ✅ CHANGELOG.md eklendi
+- ✅ DEPLOYMENT.md eklendi
+- ✅ README.md güncellendi
 
 ---
 
