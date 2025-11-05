@@ -10,10 +10,20 @@ coverage/
 dist/
 build/
 
-# Environment variables
+# Environment variables - SECURITY: Never commit .env files!
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env*.example
+*.env
+*.env.local
+*.env.*.local
+*.env.staging
+*.env.production
+.envrc
+.env.backup
+.env.old
+.env.save
 
 # Logs
 logs

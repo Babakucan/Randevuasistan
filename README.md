@@ -187,7 +187,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 - `ConversationAnalytic` - Konuşma analitikleri (gelecek)
 - `SalonSetting` - Salon ayarları (gelecek)
 
-Detaylı şema için [ARCHITECTURE.md](./ARCHITECTURE.md) dosyasına bakın.
+Detaylı şema için [ARCHITECTURE.md](./documents/ARCHITECTURE.md) dosyasına bakın.
 
 ## 🎨 Kullanıcı Arayüzü
 
@@ -251,7 +251,7 @@ Uygulama tüm cihazlarda mükemmel çalışır:
 
 ## 🚀 Deployment
 
-Detaylı deployment rehberi için [DEPLOYMENT.md](./DEPLOYMENT.md) dosyasına bakın.
+Detaylı deployment rehberi için [DEPLOYMENT.md](./documents/DEPLOYMENT.md) dosyasına bakın.
 
 ### VPS Deployment (Önerilen)
 
@@ -308,14 +308,17 @@ Production'da şu environment variables'ları ayarlayın:
 
 ## 📚 Dokümantasyon
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Mimari detayları ve teknik bilgiler
-- **[V2_ROADMAP.md](./V2_ROADMAP.md)** - Yol haritası ve gelecek planları
-- **[CHANGELOG.md](./CHANGELOG.md)** - Versiyon geçmişi ve değişiklikler
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - VPS deployment rehberi
+Detaylı dokümantasyon için [documents](./documents/) klasörüne bakın:
+
+- **[ARCHITECTURE.md](./documents/ARCHITECTURE.md)** - Mimari detayları ve teknik bilgiler
+- **[V2_ROADMAP.md](./documents/V2_ROADMAP.md)** - Yol haritası ve gelecek planları
+- **[CHANGELOG.md](./documents/CHANGELOG.md)** - Versiyon geçmişi ve değişiklikler
+- **[DEPLOYMENT.md](./documents/DEPLOYMENT.md)** - VPS deployment rehberi
+- **[PRD.md](./documents/PRD.md)** - Product Requirements Document
 
 ## 🔄 Gelecek Özellikler
 
-Detaylı planlar için [V2_ROADMAP.md](./V2_ROADMAP.md) dosyasına bakın.
+Detaylı planlar için [V2_ROADMAP.md](./documents/V2_ROADMAP.md) dosyasına bakın.
 
 ### V2.1.0 (Planlanan)
 - 🧹 Kod temizliği ve optimizasyon
