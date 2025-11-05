@@ -41,7 +41,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     });
 
     const todayEarnings = todayAppointments.reduce(
-      (sum, apt) => sum + Number(apt.service.price),
+      (sum: number, apt: Appointment & { service: Service }) => sum + Number(apt.service.price),
       0
     );
 
@@ -75,7 +75,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     });
 
     const monthEarnings = monthAppointments.reduce(
-      (sum, apt) => sum + Number(apt.service.price),
+      (sum: number, apt: Appointment & { service: Service }) => sum + Number(apt.service.price),
       0
     );
 
