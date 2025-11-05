@@ -35,6 +35,8 @@ interface Employee {
   is_active: boolean;
   avatar_url?: string;
   created_at: string;
+  salonId?: string;
+  salon_id?: string;
 }
 
 interface EmployeeStats {
@@ -723,7 +725,7 @@ export default function EmployeesPage() {
                   onChange={(e) => {
                     const employee = employees.find(emp => emp.id === e.target.value);
                     if (employee) {
-                      loadPerformanceData(employee.id, employee.salon_id, selectedDate);
+                      loadPerformanceData(employee.id, employee.salonId || employee.salon_id || '', selectedDate);
                     }
                   }}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"

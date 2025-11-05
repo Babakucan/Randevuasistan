@@ -85,6 +85,7 @@ export default function EditAppointmentPage() {
       // Load employees for the selected service
       if (appointmentData?.serviceId || appointmentData?.service_id) {
         const serviceId = appointmentData.serviceId || appointmentData.service_id
+        const appointmentDate = new Date(appointmentData.startTime || appointmentData.start_time)
         const date = appointmentDate.toISOString().split('T')[0]
         await handleServiceChangeWithDate(serviceId, date)
       }

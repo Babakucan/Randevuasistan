@@ -172,7 +172,7 @@ export default function DashboardPage() {
           let salonId = getCurrentSalonId();
           
           // Eğer currentSalonId yoksa veya geçersizse, ilk salon profilini kullan
-          if (!salonId || !user.salonProfiles.find(sp => sp.id === salonId)) {
+          if (!salonId || !user.salonProfiles.find((sp: any) => sp.id === salonId)) {
             salonId = user.salonProfiles[0].id;
             // ÖNEMLİ: setCurrentSalonId'yi API çağrılarından ÖNCE yap
             setCurrentSalonId(salonId);
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                 >
                   <Building className="w-4 h-4 text-gray-300" />
                   <span className="text-white font-medium">
-                    {user?.salonProfiles?.find(sp => sp.id === getCurrentSalonId())?.name || 
+                    {user?.salonProfiles?.find((sp: any) => sp.id === getCurrentSalonId())?.name || 
                      user?.salonProfiles?.[0]?.name || 'Salon'}
                   </span>
                   <ChevronDown className="w-4 h-4 text-gray-300" />
@@ -489,11 +489,11 @@ export default function DashboardPage() {
                       <div className="px-4 py-2 border-b border-gray-700">
                         <div className="text-xs text-gray-400 mb-1">Aktif Salon</div>
                         <div className="text-sm text-white font-medium">
-                          {user.salonProfiles.find(sp => sp.id === getCurrentSalonId())?.name || 
+                          {user.salonProfiles.find((sp: any) => sp.id === getCurrentSalonId())?.name || 
                            user.salonProfiles[0]?.name}
                         </div>
                       </div>
-                      {user.salonProfiles.map((salon) => (
+                      {user.salonProfiles.map((salon: any) => (
                         <button
                           key={salon.id}
                           onClick={() => {
