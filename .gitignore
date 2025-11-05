@@ -10,12 +10,22 @@ out/
 build/
 dist/
 
-# Environment variables
+# Environment variables - SECURITY: Never commit .env files!
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env*.example
+*.env
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+*.env.staging
+*.env.production
+.envrc
+.env.backup
+.env.old
+.env.save
 
 # Vercel
 .vercel
