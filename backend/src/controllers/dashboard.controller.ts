@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Employee, Service, Customer, Appointment } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/error';
@@ -41,7 +41,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     });
 
     const todayEarnings = todayAppointments.reduce(
-      (sum: number, apt: Appointment & { service: Service }) => sum + Number(apt.service.price),
+      (sum: number, apt: Prisma.AppointmentGetPayload<{ include: { service: true } }>) => sum + Number(apt.service.price),
       0
     );
 
@@ -75,7 +75,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     });
 
     const monthEarnings = monthAppointments.reduce(
-      (sum: number, apt: Appointment & { service: Service }) => sum + Number(apt.service.price),
+      (sum: number, apt: Prisma.AppointmentGetPayload<{ include: { service: true } }>) => sum + Number(apt.service.price),
       0
     );
 
@@ -148,7 +148,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
 
     const activities: any[] = [];
 
-    recentAppointments.forEach((apt: Appointment & { customer: Customer; service: Service; employee?: Employee | null }) => {
+    recentAppointments.forEach((apt: Prisma.AppointmentGetPayload<{ include: { customer: true; service: true; employee: true } }>) => {
       activities.push({
         id: apt.id,
         type: 'appointment',
@@ -159,7 +159,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
       });
     });
 
-    recentCustomers.forEach((customer: Customer) => {
+    recentCustomers.forEach((customer: Prisma.CustomerGetPayload<{}>) => {
       activities.push({
         id: customer.id,
         type: 'customer',
@@ -170,7 +170,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
       });
     });
 
-    recentEmployees.forEach((employee: Employee) => {
+    recentEmployees.forEach((employee: Prisma.EmployeeGetPayload<{}>) => {
       activities.push({
         id: employee.id,
         type: 'employee',
@@ -181,7 +181,7 @@ export const getRecentActivities = async (req: AuthRequest, res: Response): Prom
       });
     });
 
-    recentServices.forEach((service: Service) => {
+    recentServices.forEach((service: Prisma.ServiceGetPayload<{}>) => {
       activities.push({
         id: service.id,
         type: 'service',
