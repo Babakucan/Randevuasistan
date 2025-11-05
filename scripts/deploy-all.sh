@@ -78,12 +78,8 @@ echo "📦 9/18 - Backend bağımlılıkları yükleniyor..."
 cd backend
 npm install
 
-# 10. Backend build
-echo "📦 10/18 - Backend build ediliyor..."
-npm run build
-
-# 11. Backend .env dosyası
-echo "📦 11/18 - Backend .env dosyası oluşturuluyor..."
+# 10. Backend .env dosyası
+echo "📦 10/18 - Backend .env dosyası oluşturuluyor..."
 JWT_SECRET=$(openssl rand -base64 32)
 cat > .env << EOF
 PORT=3001
@@ -97,42 +93,49 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 EOF
 
-# 12. Prisma setup
-echo "📦 12/18 - Prisma database setup yapılıyor..."
+# 11. Prisma generate (build'den ÖNCE!)
+echo "📦 11/18 - Prisma client generate ediliyor..."
 npx prisma generate
+
+# 12. Backend build
+echo "📦 12/18 - Backend build ediliyor..."
+npm run build
+
+# 13. Prisma database setup
+echo "📦 13/18 - Prisma database setup yapılıyor..."
 npx prisma db push
 
-# 13. Frontend bağımlılıkları
-echo "📦 13/18 - Frontend bağımlılıkları yükleniyor..."
+# 14. Frontend bağımlılıkları
+echo "📦 14/19 - Frontend bağımlılıkları yükleniyor..."
 cd ../frontend
 npm install
 
-# 14. Frontend build
-echo "📦 14/18 - Frontend build ediliyor..."
+# 15. Frontend build
+echo "📦 15/19 - Frontend build ediliyor..."
 npm run build
 
-# 15. Frontend .env.local
-echo "📦 15/18 - Frontend .env.local dosyası oluşturuluyor..."
+# 16. Frontend .env.local
+echo "📦 16/19 - Frontend .env.local dosyası oluşturuluyor..."
 cat > .env.local << EOF
 NEXT_PUBLIC_API_URL=https://randevucun.shop/api
 EOF
 
-# 16. PM2 backend
-echo "📦 16/18 - Backend PM2 ile başlatılıyor..."
+# 17. PM2 backend
+echo "📦 17/19 - Backend PM2 ile başlatılıyor..."
 cd ../backend
 pm2 delete randevuasistan-backend 2>/dev/null || true
 pm2 start dist/index.js --name randevuasistan-backend
 pm2 save
 
-# 17. PM2 frontend
-echo "📦 17/18 - Frontend PM2 ile başlatılıyor..."
+# 18. PM2 frontend
+echo "📦 18/19 - Frontend PM2 ile başlatılıyor..."
 cd ../frontend
 pm2 delete randevuasistan-frontend 2>/dev/null || true
 pm2 start npm --name randevuasistan-frontend -- start
 pm2 save
 
-# 18. Nginx config
-echo "📦 18/18 - Nginx config oluşturuluyor..."
+# 19. Nginx config
+echo "📦 19/19 - Nginx config oluşturuluyor..."
 sudo tee /etc/nginx/sites-available/randevuasistan > /dev/null << 'NGINXCONF'
 server {
     listen 80;
@@ -169,8 +172,8 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 
-# 19. Firewall
-echo "📦 19/19 - Firewall ayarlanıyor..."
+# 20. Firewall
+echo "📦 20/20 - Firewall ayarlanıyor..."
 sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
