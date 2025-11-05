@@ -1,0 +1,257 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users table (replaces auth.users)
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  password  String   // bcrypt hashed
+  name      String?
+  role      String   @default("user") // admin, user
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  salonProfiles SalonProfile[]
+  callHistory  CallHistory[]
+  callRecordings CallRecording[]
+  conversationAnalytics ConversationAnalytic[]
+
+  @@map("users")
+}
+
+// Salon Profiles
+model SalonProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  ownerName   String   @map("owner_name") @db.VarChar(255)
+  phone       String?  @db.VarChar(20)
+  email       String?  @db.VarChar(255)
+  address     String?  @db.Text
+  description String?  @db.Text
+  logoUrl     String?  @map("logo_url") @db.Text
+  workingHours Json?   @map("working_hours") @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services    Service[]
+  customers   Customer[]
+  employees   Employee[]
+  appointments Appointment[]
+  aiConversations AiConversation[]
+  salonSettings SalonSetting[]
+
+  @@map("salon_profiles")
+}
+
+// Services
+model Service {
+  id          String   @id @default(uuid()) @db.Uuid
+  salonId     String   @map("salon_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  duration    Int      @default(60) // minutes
+  price       Decimal  @db.Decimal(10, 2)
+  category    String?  @db.VarChar(100)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  salon            SalonProfile     @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
+  employeeServices EmployeeService[]
+
+  @@map("services")
+}
+
+// Customers
+model Customer {
+  id          String   @id @default(uuid()) @db.Uuid
+  salonId     String   @map("salon_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  phone       String   @db.VarChar(20)
+  email       String?  @db.VarChar(255)
+  birthDate   DateTime? @map("birth_date") @db.Date
+  notes       String?  @db.Text
+  preferences Json?    @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  salon        SalonProfile   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@map("customers")
+}
+
+// Employees
+model Employee {
+  id            String   @id @default(uuid()) @db.Uuid
+  salonId       String   @map("salon_id") @db.Uuid
+  name          String   @db.VarChar(255)
+  email         String?  @db.VarChar(255)
+  phone         String?  @db.VarChar(20)
+  position      String?  @db.VarChar(100)
+  specialties   Json?    @default("[]")
+  workingHours  Json?    @map("working_hours") @default("{}")
+  leaveDays     Json?    @map("leave_days") @default("[]")
+  bio           String?  @db.Text
+  experienceYears Int?   @map("experience_years") @default(0)
+  hourlyRate    Decimal? @map("hourly_rate") @db.Decimal(10, 2) @default(0)
+  isActive      Boolean  @default(true) @map("is_active")
+  avatarUrl     String?  @map("avatar_url") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  salon            SalonProfile     @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
+  employeeServices EmployeeService[]
+
+  @@map("employees")
+}
+
+// Employee Services (Many-to-Many relationship)
+model EmployeeService {
+  id          String   @id @default(uuid()) @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  serviceId   String   @map("service_id") @db.Uuid
+  isAvailable Boolean  @default(true) @map("is_available")
+  customPrice Decimal? @map("custom_price") @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, serviceId])
+  @@map("employee_services")
+}
+
+// Appointments
+model Appointment {
+  id        String   @id @default(uuid()) @db.Uuid
+  salonId   String   @map("salon_id") @db.Uuid
+  customerId String  @map("customer_id") @db.Uuid
+  serviceId String   @map("service_id") @db.Uuid
+  employeeId String? @map("employee_id") @db.Uuid
+  startTime DateTime @map("start_time") @db.Timestamptz(6)
+  endTime   DateTime @map("end_time") @db.Timestamptz(6)
+  status    String   @default("scheduled") @db.VarChar(50) // scheduled, confirmed, completed, cancelled, no-show
+  notes     String?  @db.Text
+  source    String   @default("manual") @db.VarChar(50) // manual, whatsapp, phone, ai
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  salon    SalonProfile @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  customer Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  service  Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  employee Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  aiConversations AiConversation[]
+
+  @@map("appointments")
+}
+
+// AI Conversations
+model AiConversation {
+  id          String   @id @default(uuid()) @db.Uuid
+  salonId     String   @map("salon_id") @db.Uuid
+  customerPhone String @map("customer_phone") @db.VarChar(20)
+  platform   String   @db.VarChar(50) // whatsapp, phone
+  messages   Json?    @default("[]")
+  status     String   @default("active") @db.VarChar(50) // active, completed, archived
+  appointmentId String? @map("appointment_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  salon      SalonProfile @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@map("ai_conversations")
+}
+
+// Call History
+model CallHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  customerPhone   String   @map("customer_phone") @db.VarChar(20)
+  callType        String   @map("call_type") @db.VarChar(20) // incoming, outgoing, missed
+  duration        Int      @default(0) // seconds
+  status          String   @default("completed") @db.VarChar(20) // completed, missed, busy, failed
+  recordingUrl    String?  @map("recording_url") @db.Text
+  transcript      String?  @db.Text
+  sentimentAnalysis Json?  @map("sentiment_analysis")
+  keyPoints       Json?    @map("key_points")
+  followUpRequired Boolean @default(false) @map("follow_up_required")
+  followUpNotes   String?  @map("follow_up_notes") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callRecordings     CallRecording[]
+  conversationAnalytics ConversationAnalytic[]
+
+  @@map("call_history")
+}
+
+// Call Recordings
+model CallRecording {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  callHistoryId String @map("call_history_id") @db.Uuid
+  fileName    String   @map("file_name") @db.VarChar(255)
+  fileUrl     String   @map("file_url") @db.Text
+  fileSize    Int?     @map("file_size")
+  duration    Int?     // seconds
+  format      String?   @db.VarChar(10) // mp3, wav, etc.
+  quality     String?  @db.VarChar(20) // high, medium, low
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callHistory CallHistory @relation(fields: [callHistoryId], references: [id], onDelete: Cascade)
+
+  @@map("call_recordings")
+}
+
+// Conversation Analytics
+model ConversationAnalytic {
+  id                    String   @id @default(uuid()) @db.Uuid
+  userId                String   @map("user_id") @db.Uuid
+  callHistoryId         String   @map("call_history_id") @db.Uuid
+  customerSatisfactionScore Int? @map("customer_satisfaction_score") // 1-10
+  conversationQualityScore Int? @map("conversation_quality_score") // 1-10
+  responseTimeAvg       Int?     @map("response_time_avg") // seconds
+  interruptionCount     Int?
+  topicDetected         Json?    @map("topic_detected")
+  emotionDetected       Json?    @map("emotion_detected")
+  actionItems           Json?    @map("action_items")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callHistory CallHistory @relation(fields: [callHistoryId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_analytics")
+}
+
+// Salon Settings
+model SalonSetting {
+  id          String   @id @default(uuid()) @db.Uuid
+  salonId     String   @map("salon_id") @db.Uuid
+  settingKey  String   @map("setting_key") @db.VarChar(255)
+  settingValue Json?   @map("setting_value")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  salon SalonProfile @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  @@unique([salonId, settingKey])
+  @@map("salon_settings")
+}
+

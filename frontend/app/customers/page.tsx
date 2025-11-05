@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { capitalizeName } from '@/lib/utils';
+import { authApi, customersApi, getToken, removeToken } from '@/lib/api';
 import { 
   Users, 
   Plus, 
@@ -26,8 +26,11 @@ interface Customer {
   lastAppointment?: {
     date: string;
     daysAgo: number;
+    isUpcoming: boolean;
   };
   totalAppointments: number;
+  activeAppointmentsCount: number;
+  hasActiveAppointments: boolean;
 }
 
 export default function CustomersPage() {
@@ -63,89 +66,107 @@ export default function CustomersPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = getToken();
+      if (!token) {
         router.push('/login');
         return;
       }
-      setUser(user);
-      await loadCustomers(user.id);
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+        await loadCustomers();
+      }
     } catch (error) {
       console.error('Error checking user:', error);
+      removeToken();
       router.push('/login');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadCustomers = async (userId: string) => {
+  const loadCustomers = async () => {
     try {
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (profile) {
-        // Müşterileri ve randevu bilgilerini yükle
-        const { data: customersData } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('salon_id', profile.id)
-          .order('created_at', { ascending: false });
-
-        if (customersData) {
-          // Her müşteri için randevu bilgilerini al
-          const customersWithAppointments = await Promise.all(
-            customersData.map(async (customer) => {
-              // Müşterinin tüm randevularını al
-              const { data: appointments } = await supabase
-                .from('appointments')
-                .select('start_time')
-                .eq('customer_id', customer.id)
-                .order('start_time', { ascending: false });
-
-              const totalAppointments = appointments?.length || 0;
-              
-              // Son randevu bilgisi
-              let lastAppointment = undefined;
-              if (appointments && appointments.length > 0) {
-                const lastAppointmentDate = new Date(appointments[0].start_time);
-                const today = new Date();
-                const daysDiff = Math.floor((lastAppointmentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                
-                lastAppointment = {
-                  date: lastAppointmentDate.toISOString(),
-                  daysAgo: daysDiff // Pozitif: gelecek, negatif: geçmiş
-                };
-              }
-
-              return {
-                ...customer,
-                lastAppointment,
-                totalAppointments
-              };
-            })
-          );
-
-          setCustomers(customersWithAppointments);
-
-          // Aktif/aktif olmayan müşteri istatistiklerini hesapla
-          const oneYearAgo = new Date();
-          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-          const activeCustomers = customersWithAppointments.filter(customer => 
-            customer.lastAppointment && 
-            new Date(customer.lastAppointment.date) > oneYearAgo
-          ).length;
-
-          const inactiveCustomers = customersWithAppointments.length - activeCustomers;
-
-          setCustomerStats({
-            activeCustomers,
-            inactiveCustomers
+      const customersData = await customersApi.getAll();
+      
+      if (customersData && Array.isArray(customersData)) {
+        // Her müşteri için randevu bilgilerini işle
+        const customersWithAppointments = customersData.map((customer: any) => {
+          // Müşterinin randevu bilgilerini işle
+          const appointments = customer.appointments || [];
+          const totalAppointments = appointments.length;
+          
+          // Aktif randevular (gelecekteki randevular)
+          const now = new Date();
+          const activeAppointments = appointments.filter((apt: any) => {
+            const startTime = new Date(apt.startTime || apt.start_time);
+            return startTime >= now && apt.status !== 'cancelled';
           });
-        }
+          
+          // Son randevu bilgisi (geçmiş ve gelecek randevuları dahil)
+          let lastAppointment = undefined;
+          if (appointments && appointments.length > 0) {
+            const sortedAppointments = [...appointments].sort((a: any, b: any) => {
+              const dateA = new Date(a.startTime || a.start_time).getTime();
+              const dateB = new Date(b.startTime || b.start_time).getTime();
+              return dateB - dateA; // En yeni randevu önce
+            });
+            
+            const lastAppointmentData = sortedAppointments[0];
+            const lastAppointmentDate = new Date(lastAppointmentData.startTime || lastAppointmentData.start_time);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const appointmentDateOnly = new Date(lastAppointmentDate);
+            appointmentDateOnly.setHours(0, 0, 0, 0);
+            const daysDiff = Math.floor((appointmentDateOnly.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            lastAppointment = {
+              date: lastAppointmentDate.toISOString(),
+              daysAgo: daysDiff,
+              isUpcoming: lastAppointmentDate >= now
+            };
+          }
+
+          return {
+            id: customer.id,
+            name: customer.name,
+            phone: customer.phone || '',
+            email: customer.email || '',
+            notes: customer.notes || '',
+            created_at: customer.created_at || customer.createdAt,
+            lastAppointment,
+            totalAppointments,
+            activeAppointmentsCount: activeAppointments.length,
+            hasActiveAppointments: activeAppointments.length > 0
+          };
+        });
+
+        setCustomers(customersWithAppointments);
+
+        // Aktif/aktif olmayan müşteri istatistiklerini hesapla
+        // Aktif müşteri: Gelecekteki randevusu olan veya son 1 yılda randevu alan müşteri
+        const now = new Date();
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+        const activeCustomers = customersWithAppointments.filter(customer => {
+          // Gelecekteki aktif randevusu varsa kesinlikle aktif
+          if (customer.hasActiveAppointments) {
+            return true;
+          }
+          // Son 1 yılda randevu almışsa aktif
+          if (customer.lastAppointment && new Date(customer.lastAppointment.date) > oneYearAgo) {
+            return true;
+          }
+          return false;
+        }).length;
+
+        const inactiveCustomers = customersWithAppointments.length - activeCustomers;
+
+        setCustomerStats({
+          activeCustomers,
+          inactiveCustomers
+        });
       }
     } catch (error) {
       console.error('Error loading customers:', error);
@@ -165,11 +186,13 @@ export default function CustomersPage() {
     // Sonra aktiflik filtresini uygula
     if (activeFilter === 'all') return true;
     
+    const now = new Date();
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     
-    const isActive = customer.lastAppointment && 
-      new Date(customer.lastAppointment.date) > oneYearAgo;
+    // Aktif müşteri: Gelecekteki randevusu olan veya son 1 yılda randevu alan
+    const isActive = customer.hasActiveAppointments || 
+      (customer.lastAppointment && new Date(customer.lastAppointment.date) > oneYearAgo);
 
     if (activeFilter === 'active') return isActive;
     if (activeFilter === 'inactive') return !isActive;
@@ -181,13 +204,7 @@ export default function CustomersPage() {
     if (!confirm('Bu müşteriyi silmek istediğinizden emin misiniz?')) return;
 
     try {
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', customerId);
-
-      if (error) throw error;
-
+      await customersApi.delete(customerId);
       setCustomers(prev => prev.filter(cust => cust.id !== customerId));
       alert('Müşteri başarıyla silindi!');
     } catch (error) {
@@ -285,7 +302,7 @@ export default function CustomersPage() {
                       <div className="border-t border-gray-700 mt-2 pt-2">
                         <button
                           onClick={async () => {
-                            await supabase.auth.signOut();
+                            removeToken();
                             router.push('/login');
                           }}
                           className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
@@ -447,14 +464,21 @@ export default function CustomersPage() {
                           <span>
                             {customer.totalAppointments > 0 ? (
                               <>
-                                <span className="font-medium text-white">{customer.totalAppointments}. randevu</span>
+                                <span className="font-medium text-white">{customer.totalAppointments} randevu</span>
+                                {customer.activeAppointmentsCount > 0 && (
+                                  <span className="ml-2 px-2 py-1 bg-green-600/20 text-green-400 text-xs rounded-full">
+                                    {customer.activeAppointmentsCount} aktif
+                                  </span>
+                                )}
                                 {customer.lastAppointment && (
-                                  <span className="text-gray-400">
-                                    {' '}({customer.lastAppointment.daysAgo > 0 
-                                      ? `${customer.lastAppointment.daysAgo} gün sonra` 
-                                      : customer.lastAppointment.daysAgo < 0 
-                                        ? `${Math.abs(customer.lastAppointment.daysAgo)} gün önce`
-                                        : 'bugün'
+                                  <span className="text-gray-400 ml-2">
+                                    ({customer.lastAppointment.isUpcoming
+                                      ? customer.lastAppointment.daysAgo > 0 
+                                        ? `${customer.lastAppointment.daysAgo} gün sonra` 
+                                        : customer.lastAppointment.daysAgo < 0 
+                                          ? `${Math.abs(customer.lastAppointment.daysAgo)} gün önce`
+                                          : 'bugün'
+                                      : `${Math.abs(customer.lastAppointment.daysAgo)} gün önce`
                                     })
                                   </span>
                                 )}
@@ -466,7 +490,7 @@ export default function CustomersPage() {
                         </div>
                         {customer.lastAppointment && (
                           <div className="text-xs text-gray-500">
-                            Son randevu: {new Date(customer.lastAppointment.date).toLocaleDateString('tr-TR')}
+                            {customer.lastAppointment.isUpcoming ? 'Yaklaşan' : 'Son'} randevu: {new Date(customer.lastAppointment.date).toLocaleDateString('tr-TR')} {new Date(customer.lastAppointment.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
                       </div>

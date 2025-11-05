@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Edit, Users, Mail, Phone, Briefcase, Clock, Calendar, Star } from 'lucide-react'
-import { auth, employees } from '@/lib/supabase'
+import { authApi, employeesApi, getToken, removeToken } from '@/lib/api'
 
 export default function EmployeeDetailPage() {
   const router = useRouter()
@@ -29,46 +29,36 @@ export default function EmployeeDetailPage() {
 
   const checkUser = async () => {
     try {
-      console.log('Checking user authentication...')
-      const { data: { user } } = await auth.getCurrentUser()
-      
-      if (!user) {
-        console.log('No user found, redirecting to login')
-        router.push('/login')
-        return
+      const token = getToken();
+      if (!token) {
+        router.push('/login');
+        setLoading(false);
+        return;
       }
-      
-      console.log('User authenticated:', user.id)
-      setUser(user)
+
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+      } else {
+        router.push('/login');
+        setLoading(false);
+      }
     } catch (error) {
-      console.error('Auth error:', error)
-      router.push('/login')
+      console.error('Auth error:', error);
+      removeToken();
+      router.push('/login');
+      setLoading(false);
     }
   }
 
   const loadEmployee = async () => {
     try {
-      console.log('Loading employee with ID:', employeeId)
-      console.log('User ID:', user.id)
+      const employeeData = await employeesApi.getById(employeeId);
       
-      const { data, error } = await employees.getEmployeeById(user.id, employeeId)
-      
-      console.log('API Response:', { data, error })
-      
-      if (error) {
-        console.error('Error loading employee:', error)
-        setLoading(false)
-        return
-      }
-      
-      if (data) {
-        console.log('Employee data loaded:', data)
-        console.log('Working hours before:', data.working_hours)
-        
+      if (employeeData) {
         // Çalışma saatleri yoksa varsayılan değerler oluştur
-        if (!data.working_hours || Object.keys(data.working_hours).length === 0) {
-          console.log('Creating default working hours')
-          data.working_hours = {
+        if (!employeeData.workingHours || Object.keys(employeeData.workingHours).length === 0) {
+          employeeData.workingHours = {
             monday: { available: true, start: '09:00', end: '18:00' },
             tuesday: { available: true, start: '09:00', end: '18:00' },
             wednesday: { available: true, start: '09:00', end: '18:00' },
@@ -76,26 +66,30 @@ export default function EmployeeDetailPage() {
             friday: { available: true, start: '09:00', end: '18:00' },
             saturday: { available: true, start: '09:00', end: '16:00' },
             sunday: { available: false, start: '09:00', end: '18:00' }
-          }
+          };
         }
         
-        console.log('Working hours after:', data.working_hours)
+        // Alan adları uyumluluğu için normalize et
+        const normalizedEmployee = {
+          ...employeeData,
+          workingHours: employeeData.workingHours || employeeData.working_hours || {},
+          leaveDays: employeeData.leaveDays || employeeData.leave_days || [],
+          experienceYears: employeeData.experienceYears || employeeData.experience_years,
+          hourlyRate: employeeData.hourlyRate || employeeData.hourly_rate
+        };
         
         // İzin günleri yoksa boş array oluştur
-        if (!data.leave_days) {
-          data.leave_days = []
+        if (!normalizedEmployee.leaveDays || !Array.isArray(normalizedEmployee.leaveDays)) {
+          normalizedEmployee.leaveDays = [];
         }
         
-        console.log('Final employee data:', data)
-        setEmployee(data)
-        setLoading(false)
-      } else {
-        console.log('No employee data found')
-        setLoading(false)
+        setEmployee(normalizedEmployee);
       }
     } catch (error) {
-      console.error('Error loading employee:', error)
-      setLoading(false)
+      console.error('Error loading employee:', error);
+      router.push('/employees');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -171,9 +165,11 @@ export default function EmployeeDetailPage() {
     setUpdatingTime(timeKey)
     
     // Çalışma saatleri yoksa varsayılan değerler oluştur
-    if (!employee.working_hours || Object.keys(employee.working_hours).length === 0) {
+    const currentWorkingHours = employee.workingHours || employee.working_hours || {}
+    let workingHoursToUpdate = currentWorkingHours
+    if (!workingHoursToUpdate || Object.keys(workingHoursToUpdate).length === 0) {
       console.log('Creating default working hours for time change')
-      employee.working_hours = {
+      workingHoursToUpdate = {
         monday: { available: true, start: '09:00', end: '18:00' },
         tuesday: { available: true, start: '09:00', end: '18:00' },
         wednesday: { available: true, start: '09:00', end: '18:00' },
@@ -186,9 +182,9 @@ export default function EmployeeDetailPage() {
     
     // Önce local state'i güncelle (anında görünüm için)
     const updatedWorkingHours = {
-      ...employee.working_hours,
+      ...workingHoursToUpdate,
       [day]: {
-        ...employee.working_hours[day],
+        ...(workingHoursToUpdate[day] || { available: true, start: '09:00', end: '18:00' }),
         [field]: value
       }
     }
@@ -198,39 +194,45 @@ export default function EmployeeDetailPage() {
     // Local state'i hemen güncelle
     setEmployee({
       ...employee,
-      working_hours: updatedWorkingHours
+      workingHours: updatedWorkingHours
     })
     
     try {
       console.log('Calling updateEmployee...')
-      const result = await employees.updateEmployee(user.id, employee.id, {
+      const currentLeaveDays = Array.isArray(employee.leaveDays) 
+        ? employee.leaveDays 
+        : (Array.isArray(employee.leave_days) ? employee.leave_days : [])
+      
+      const result = await employeesApi.update(employee.id, {
         name: employee.name,
         email: employee.email,
         phone: employee.phone,
         position: employee.position,
-        specialties: employee.specialties || [],
-        working_hours: updatedWorkingHours,
-        leave_days: employee.leave_days || [],
+        specialties: Array.isArray(employee.specialties) ? employee.specialties : (employee.specialties ? [employee.specialties] : []),
+        workingHours: updatedWorkingHours,
+        leaveDays: currentLeaveDays,
         bio: employee.bio,
-        experience_years: employee.experience_years,
-        hourly_rate: employee.hourly_rate
+        experienceYears: employee.experienceYears || employee.experience_years,
+        hourlyRate: employee.hourlyRate || employee.hourly_rate
       })
 
       console.log('Update result:', result)
 
-             if (result.data && result.data.length > 0) {
-         console.log('Time updated successfully:', result.data[0])
-         // Server'dan gelen güncel veriyi set et
-         setEmployee(result.data[0])
-       } else {
-         console.error('Failed to update time:', result.error)
-         // Hata durumunda eski veriyi geri yükle
-         setEmployee(employee)
-       }
-         } catch (error) {
+      if (result) {
+        console.log('Time updated successfully')
+        // Güncel veriyi tekrar yükle
+        await loadEmployee();
+      } else {
+        console.error('Failed to update time')
+        // Hata durumunda eski veriyi geri yükle
+        await loadEmployee();
+      }
+         } catch (error: any) {
        console.error('Error updating time:', error)
+       const errorMessage = error?.message || 'Çalışma saati güncellenirken hata oluştu.'
+       alert(errorMessage)
        // Hata durumunda eski veriyi geri yükle
-       setEmployee(employee)
+       await loadEmployee();
      } finally {
        setUpdatingTime(null)
      }
@@ -252,7 +254,11 @@ export default function EmployeeDetailPage() {
     
     setUpdatingLeaveDay(day)
     
-    const currentLeaveDays = employee.leave_days || []
+    // leaveDays alanını doğru şekilde al (normalize et)
+    const currentLeaveDays = Array.isArray(employee.leaveDays) 
+      ? employee.leaveDays 
+      : (Array.isArray(employee.leave_days) ? employee.leave_days : [])
+    
     const isCurrentlyOnLeave = currentLeaveDays.includes(day)
     
     let updatedLeaveDays
@@ -267,41 +273,43 @@ export default function EmployeeDetailPage() {
     // Önce local state'i güncelle (anında görünüm için)
     const updatedEmployee = {
       ...employee,
-      leave_days: updatedLeaveDays
+      leaveDays: updatedLeaveDays
     }
     
     setEmployee(updatedEmployee)
     
     try {
       console.log('Calling updateEmployee for leave days...')
-      const result = await employees.updateEmployee(user.id, employee.id, {
+      const result = await employeesApi.update(employee.id, {
         name: employee.name,
         email: employee.email,
         phone: employee.phone,
         position: employee.position,
-        specialties: employee.specialties || [],
-        working_hours: employee.working_hours,
-        leave_days: updatedLeaveDays,
+        specialties: Array.isArray(employee.specialties) ? employee.specialties : (employee.specialties ? [employee.specialties] : []),
+        workingHours: employee.workingHours || employee.working_hours || {},
+        leaveDays: updatedLeaveDays,
         bio: employee.bio,
-        experience_years: employee.experience_years,
-        hourly_rate: employee.hourly_rate
+        experienceYears: employee.experienceYears || employee.experience_years,
+        hourlyRate: employee.hourlyRate || employee.hourly_rate
       })
 
       console.log('Leave update result:', result)
 
-      if (result.data && result.data.length > 0) {
-        console.log('Employee updated successfully:', result.data[0])
-        // Server'dan gelen güncel veriyi set et
-        setEmployee(result.data[0])
+      if (result) {
+        console.log('Employee updated successfully')
+        // Güncel veriyi tekrar yükle
+        await loadEmployee();
       } else {
-        console.error('Failed to update employee:', result.error)
+        console.error('Failed to update employee')
         // Hata durumunda eski veriyi geri yükle
-        setEmployee(employee)
+        await loadEmployee();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating leave day:', error)
+      const errorMessage = error?.message || 'İzin günü güncellenirken hata oluştu.'
+      alert(errorMessage)
       // Hata durumunda eski veriyi geri yükle
-      setEmployee(employee)
+      await loadEmployee();
     } finally {
       setUpdatingLeaveDay(null)
     }
@@ -433,11 +441,14 @@ export default function EmployeeDetailPage() {
               </h2>
               
                              <div className="space-y-4">
-                 {employee.working_hours && Object.keys(employee.working_hours).length > 0 ? (
-                   Object.entries(employee.working_hours)
+                 {employee.workingHours && Object.keys(employee.workingHours).length > 0 ? (
+                   Object.entries(employee.workingHours)
                      .sort(([a], [b]) => getDayOrder(a) - getDayOrder(b))
                      .map(([day, hours]: [string, any]) => {
-                       const isOnLeave = (employee.leave_days || []).includes(day)
+                       const currentLeaveDays = Array.isArray(employee.leaveDays) 
+                         ? employee.leaveDays 
+                         : (Array.isArray(employee.leave_days) ? employee.leave_days : [])
+                       const isOnLeave = currentLeaveDays.includes(day)
                        
                        return (
                          <div key={day} className={`p-4 rounded-xl border-2 transition-all duration-200 ${
@@ -565,7 +576,7 @@ export default function EmployeeDetailPage() {
                  ) : (
                    <div className="text-center py-8">
                      <p className="text-gray-500">Çalışma saatleri yükleniyor...</p>
-                     <p className="text-sm text-gray-400 mt-2">Debug: {JSON.stringify(employee.working_hours)}</p>
+                     <p className="text-sm text-gray-400 mt-2">Debug: {JSON.stringify(employee.workingHours)}</p>
                    </div>
                  )}
                </div>
@@ -579,9 +590,9 @@ export default function EmployeeDetailPage() {
                 İzin Günleri
               </h2>
               
-                             {(employee.leave_days && employee.leave_days.length > 0) ? (
+                             {(employee.leaveDays && employee.leaveDays.length > 0) ? (
                  <div className="space-y-3">
-                   {employee.leave_days.map((day: string, index: number) => (
+                   {employee.leaveDays.map((day: string, index: number) => (
                      <div key={index} className="flex items-center justify-between p-4 bg-red-50 border-2 border-red-200 rounded-xl">
                        <div className="flex items-center gap-3">
                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>

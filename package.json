@@ -11,12 +11,10 @@
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
-    "test": "npm run test:frontend && npm run test:backend",
+    "test": "cd frontend && npm test",
     "test:frontend": "cd frontend && npm test",
-    "test:backend": "cd backend && npm test",
-    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint": "cd frontend && npm run lint",
     "lint:frontend": "cd frontend && npm run lint",
-    "lint:backend": "cd backend && npm run lint",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "prepare": "husky install"
   },
@@ -28,8 +26,7 @@
     "telefon",
     "yönetim",
     "nextjs",
-    "typescript",
-    "supabase"
+    "typescript"
   ],
   "author": "Randevuasistan Team",
   "license": "MIT",

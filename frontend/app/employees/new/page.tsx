@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, ArrowLeft, Save, Calendar, Check } from 'lucide-react'
-import { auth, db, employees } from '@/lib/supabase'
 import { capitalizeName } from '@/lib/utils'
+import { authApi, employeesApi, servicesApi, getToken, removeToken } from '@/lib/api'
 
 export default function NewEmployeePage() {
   const router = useRouter()
@@ -38,27 +38,31 @@ export default function NewEmployeePage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await auth.getCurrentUser()
-      if (!user) {
-        router.push('/login')
-        return
+      const token = getToken();
+      if (!token) {
+        router.push('/login');
+        setLoading(false);
+        return;
       }
-      setUser(user)
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+      }
     } catch (error) {
-      console.error('Auth error:', error)
-      router.push('/login')
+      console.error('Auth error:', error);
+      removeToken();
+      router.push('/login');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   const loadServices = async () => {
     try {
       if (!user) return
-      const { data: salonProfile } = await db.getSalonProfile(user.id)
-      if (salonProfile) {
-        const { data: servicesData } = await db.getServices(user.id)
-        setServices(servicesData || [])
+      const servicesData = await servicesApi.getAll()
+      if (servicesData && Array.isArray(servicesData)) {
+        setServices(servicesData)
       }
     } catch (error) {
       console.error('Error loading services:', error)
@@ -97,62 +101,39 @@ export default function NewEmployeePage() {
 
     setSubmitting(true)
     try {
-      // Get salon profile or create if not exists
-      let { data: salonProfile } = await db.getSalonProfile(user.id)
-      
-      if (!salonProfile) {
-        // Create default salon profile
-        const { data: newProfile } = await db.createSalonProfile(user.id, {
-          salonName: 'Güzellik Salonu',
-          name: user.email?.split('@')[0] || 'Salon Sahibi',
-          phone: '+90 555 000 0000',
-          email: user.email || 'salon@example.com'
-        })
-        salonProfile = newProfile?.[0]
-        
-        if (!salonProfile) {
-          alert('Salon profili oluşturulamadı.')
-          return
-        }
-      }
+      // specialties'i string'den array'e çevir
+      const specialtiesArray = formData.specialties
+        ? formData.specialties.split(',').map(s => s.trim()).filter(s => s)
+        : []
 
-      const result = await db.createEmployee(user.id, {
+      const employeeData = {
         name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        position: formData.position,
-        specialties: formData.specialties.split(',').map(s => s.trim()).filter(s => s),
-        working_hours: {
-          monday: { start: '09:00', end: '18:00' },
-          tuesday: { start: '09:00', end: '18:00' },
-          wednesday: { start: '09:00', end: '18:00' },
-          thursday: { start: '09:00', end: '18:00' },
-          friday: { start: '09:00', end: '18:00' },
-          saturday: { start: '09:00', end: '17:00' },
-          sunday: { start: '', end: '' }
-        },
-        bio: formData.bio,
-        experience_years: parseInt(formData.experience_years) || 0,
-        hourly_rate: parseFloat(formData.hourly_rate) || 0
-      })
-
-      // Seçilen hizmetleri çalışana ata
-      if (result.data && selectedServices.length > 0) {
-        const employeeId = result.data[0].id
-        for (const serviceId of selectedServices) {
-          await employees.assignServiceToEmployee(user.id, employeeId, serviceId)
-        }
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        position: formData.position || undefined,
+        specialties: specialtiesArray.length > 0 ? specialtiesArray : undefined,
+        hourlyRate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
+        bio: formData.bio || undefined,
+        experienceYears: formData.experience_years ? parseInt(formData.experience_years) : undefined,
+        isActive: true,
       }
 
-      if (result.data) {
+      const result = await employeesApi.create(employeeData)
+
+      if (result) {
         alert('Çalışan başarıyla oluşturuldu!')
         router.push('/employees')
       } else {
         alert('Çalışan oluşturulurken hata oluştu.')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating employee:', error)
-      alert('Çalışan oluşturulurken hata oluştu.')
+      // Validation hatalarını göster
+      if (error.message && error.message.includes('Validation')) {
+        alert(`Doğrulama hatası: ${error.message}`)
+      } else {
+        alert('Çalışan oluşturulurken hata oluştu: ' + (error.message || 'Bilinmeyen hata'))
+      }
     } finally {
       setSubmitting(false)
     }

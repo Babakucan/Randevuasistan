@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Users, MessageCircle, Phone, LogOut, User, ArrowLeft, Edit, Trash2, Mail, Clock, MapPin } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
+import { authApi, customersApi, appointmentsApi, getToken, removeToken } from '@/lib/api'
 
 export default function CustomerDetailPage() {
   const router = useRouter()
@@ -36,54 +36,50 @@ export default function CustomerDetailPage() {
 
   const checkUser = async () => {
     try {
-      const { data: sessionData } = await auth.getSession()
-      
-      if (sessionData.session) {
-        setUser(sessionData.session.user)
-        await loadCustomerData(sessionData.session.user.id)
+      const token = getToken();
+      if (!token) {
+        router.push('/login');
+        setLoading(false);
+        return;
+      }
+
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+        await loadCustomerData();
       } else {
-        const { user: currentUser } = await auth.getCurrentUser()
-        if (currentUser) {
-          setUser(currentUser)
-          await loadCustomerData(currentUser.id)
-        } else {
-          router.push('/login')
-          return
-        }
+        router.push('/login');
+        setLoading(false);
       }
     } catch (err) {
-      console.error('Auth check error:', err)
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
+      console.error('Auth check error:', err);
+      removeToken();
+      router.push('/login');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  const loadCustomerData = async (userId: string) => {
+  const loadCustomerData = async () => {
     try {
       // Müşteri bilgilerini yükle
-      const { data: customerData, error: customerError } = await db.getCustomerById(userId, customerId)
-
-      if (customerError) {
-        console.error('Error loading customer:', customerError)
-        router.push('/customers')
-        return
-      }
-
-      setCustomer(customerData)
+      const customerData = await customersApi.getById(customerId);
+      setCustomer(customerData);
 
       // Müşterinin randevularını yükle
-      const { data: appointmentsData, error: appointmentsError } = await db.getCustomerAppointments(userId, customerId)
-
-      if (appointmentsError) {
-        console.error('Error loading appointments:', appointmentsError)
-      } else {
-        setAppointments(appointmentsData || [])
+      try {
+        const allAppointments = await appointmentsApi.getAll();
+        const customerAppointments = allAppointments.filter(
+          (apt: any) => apt.customerId === customerId
+        );
+        setAppointments(customerAppointments || []);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        setAppointments([]);
       }
     } catch (error) {
-      console.error('Error loading customer data:', error)
+      console.error('Error loading customer data:', error);
+      router.push('/customers');
     }
   }
 
@@ -204,8 +200,8 @@ export default function CustomerDetailPage() {
                     </button>
                     <div className="border-t border-gray-700 mt-2 pt-2">
                       <button
-                        onClick={async () => {
-                          await auth.signOut();
+                        onClick={() => {
+                          removeToken();
                           router.push('/login');
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
@@ -243,7 +239,7 @@ export default function CustomerDetailPage() {
                   </div>
                   <div className="flex items-center space-x-2 text-gray-300">
                     <Clock className="w-4 h-4" />
-                    <span>Kayıt: {new Date(customer.created_at).toLocaleDateString('tr-TR')}</span>
+                    <span>Kayıt: {new Date(customer.createdAt || customer.created_at).toLocaleDateString('tr-TR')}</span>
                   </div>
                 </div>
               </div>
@@ -351,15 +347,15 @@ export default function CustomerDetailPage() {
                       onClick={() => router.push(`/appointments/${appointment.id}`)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-white">{appointment.services?.name}</div>
-                        <div className="text-sm text-gray-400">{appointment.services?.duration} dk</div>
+                        <div className="text-sm font-medium text-white">{appointment.service?.name || appointment.services?.name}</div>
+                        <div className="text-sm text-gray-400">{appointment.service?.duration || appointment.services?.duration} dk</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-white">
-                          {new Date(appointment.appointment_date).toLocaleDateString('tr-TR')}
+                          {new Date(appointment.startTime || appointment.appointment_date).toLocaleDateString('tr-TR')}
                         </div>
                         <div className="text-sm text-gray-400">
-                          {new Date(appointment.appointment_date).toLocaleTimeString('tr-TR', { 
+                          {new Date(appointment.startTime || appointment.appointment_date).toLocaleTimeString('tr-TR', { 
                             hour: '2-digit', 
                             minute: '2-digit' 
                           })}
@@ -371,7 +367,7 @@ export default function CustomerDetailPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                        {formatCurrency(appointment.services?.price || 0)}
+                        {formatCurrency(appointment.service?.price || appointment.services?.price || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">

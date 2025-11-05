@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { capitalizeName } from '@/lib/utils';
+import { authApi, dashboardApi, customersApi, servicesApi, employeesApi, appointmentsApi, removeToken, getToken, getCurrentSalonId, setCurrentSalonId } from '@/lib/api';
+import Link from 'next/link';
 import { 
   Calendar, 
   Users, 
@@ -19,7 +20,9 @@ import {
   Eye,
   Phone,
   MessageCircle,
-  BarChart3
+  BarChart3,
+  Building,
+  ChevronDown
 } from 'lucide-react';
 
 interface RecentActivity {
@@ -81,6 +84,7 @@ export default function DashboardPage() {
   const [showQuickService, setShowQuickService] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
   const [appointmentNotifications, setAppointmentNotifications] = useState<AppointmentNotification[]>([]);
+  const [showSalonDropdown, setShowSalonDropdown] = useState(false);
 
   const [weeklyData, setWeeklyData] = useState<ChartData>({ labels: [], data: [], colors: [] });
   const [serviceData, setServiceData] = useState<ChartData>({ labels: [], data: [], colors: [] });
@@ -140,6 +144,9 @@ export default function DashboardPage() {
       if (!target.closest('.profile-menu')) {
         setShowProfileMenu(false);
       }
+      if (showSalonDropdown && !target.closest('.salon-dropdown')) {
+        setShowSalonDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -150,37 +157,56 @@ export default function DashboardPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = getToken();
+      if (!token) {
         router.push('/login');
+        setLoading(false);
         return;
       }
-      setUser(user);
-      await loadDashboardData(user.id);
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+        
+        // Salon profil kontrolü ve currentSalonId ayarlama
+        if (user.salonProfiles && user.salonProfiles.length > 0) {
+          let salonId = getCurrentSalonId();
+          
+          // Eğer currentSalonId yoksa veya geçersizse, ilk salon profilini kullan
+          if (!salonId || !user.salonProfiles.find(sp => sp.id === salonId)) {
+            salonId = user.salonProfiles[0].id;
+            // ÖNEMLİ: setCurrentSalonId'yi API çağrılarından ÖNCE yap
+            setCurrentSalonId(salonId);
+          }
+          
+          // User geldikten sonra verileri yükle
+          try {
+            await Promise.all([
+              loadStats(salonId),
+              loadRecentActivities(salonId),
+              loadQuickAppointmentData(salonId),
+            ]);
+          } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            // Hata olsa bile loading'i kapat
+          }
+        } else {
+          console.error('No salon profiles found for user');
+        }
+      }
     } catch (error) {
       console.error('Error checking user:', error);
+      removeToken();
       router.push('/login');
+    } finally {
+      // Her durumda loading'i kapat
+      setLoading(false);
     }
   };
 
   const loadDashboardData = async (userId: string) => {
     try {
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (profile) {
-        await Promise.all([
-          loadStats(profile.id),
-          loadRecentActivities(profile.id),
-          loadNotifications(profile.id),
-          loadChartData(profile.id),
-          loadQuickAppointmentData(profile.id),
-          loadAppointmentNotifications(profile.id)
-        ]);
-      }
+      // Bu fonksiyon artık kullanılmıyor, checkUser içinde yapılıyor
+      setLoading(false);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -188,263 +214,61 @@ export default function DashboardPage() {
     }
   };
 
-  const loadStats = async (salonId: string) => {
+  const loadStats = async (salonId?: string) => {
     try {
-      // Temel istatistikler
-      const [appointments, customers, employees, services] = await Promise.all([
-        supabase.from('appointments').select('*').eq('salon_id', salonId),
-        supabase.from('customers').select('*').eq('salon_id', salonId),
-        supabase.from('employees').select('*').eq('salon_id', salonId),
-        supabase.from('services').select('*').eq('salon_id', salonId)
-      ]);
-
-      // Bugünkü randevular ve kazanç
-      const today = new Date().toISOString().split('T')[0];
-      const { data: todayAppointments } = await supabase
-        .from('appointments')
-        .select('*, services(price)')
-        .eq('salon_id', salonId)
-        .gte('start_time', `${today}T00:00:00`)
-        .lt('start_time', `${today}T23:59:59`);
-
-      // Bu hafta randevular
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - 7);
-      const { data: weekAppointments } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('salon_id', salonId)
-        .gte('start_time', weekStart.toISOString());
-
-      // Bu ay kazanç
-      const monthStart = new Date();
-      monthStart.setMonth(monthStart.getMonth() - 1);
-      const { data: monthAppointments } = await supabase
-        .from('appointments')
-        .select('*, services(price)')
-        .eq('salon_id', salonId)
-        .gte('start_time', monthStart.toISOString());
-
-      const todayEarnings = todayAppointments?.reduce((sum, apt) => sum + ((apt.services as any)?.price || 0), 0) || 0;
-      const monthEarnings = monthAppointments?.reduce((sum, apt) => sum + ((apt.services as any)?.price || 0), 0) || 0;
-
-      setStats({
-        totalAppointments: appointments.data?.length || 0,
-        totalCustomers: customers.data?.length || 0,
-        totalEmployees: employees.data?.length || 0,
-        totalServices: services.data?.length || 0,
-        todayAppointments: todayAppointments?.length || 0,
-        todayEarnings,
-        thisWeekAppointments: weekAppointments?.length || 0,
-        thisMonthEarnings: monthEarnings
-      });
+      const statsData = await dashboardApi.getStats();
+      if (statsData) {
+        setStats({
+          totalAppointments: statsData.totalAppointments || 0,
+          totalCustomers: statsData.totalCustomers || 0,
+          totalEmployees: statsData.totalEmployees || 0,
+          totalServices: statsData.totalServices || 0,
+          todayAppointments: statsData.todayAppointments || 0,
+          todayEarnings: statsData.todayEarnings || 0,
+          thisWeekAppointments: statsData.thisWeekAppointments || 0,
+          thisMonthEarnings: statsData.thisMonthEarnings || 0
+        });
+      }
     } catch (error) {
       console.error('Error loading stats:', error);
+      setStats({
+        totalAppointments: 0,
+        totalCustomers: 0,
+        totalEmployees: 0,
+        totalServices: 0,
+        todayAppointments: 0,
+        todayEarnings: 0,
+        thisWeekAppointments: 0,
+        thisMonthEarnings: 0
+      });
     }
   };
 
-  const loadRecentActivities = async (salonId: string) => {
+  const loadRecentActivities = async (salonId?: string) => {
     try {
-      const activities: RecentActivity[] = [];
-
-      // Get recent appointments
-      const { data: recentAppointments } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          start_time,
-          status,
-          created_at,
-          customers(name),
-          employees(name),
-          services(name)
-        `)
-        .eq('salon_id', salonId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (recentAppointments) {
-        recentAppointments.forEach((appointment: any, index) => {
-          const customerName = appointment.customers?.name || 'Bilinmeyen Müşteri';
-          const serviceName = appointment.services?.name || 'Bilinmeyen Hizmet';
-          const employeeName = appointment.employees?.name || 'Bilinmeyen Çalışan';
-          
-          const formattedCustomerName = capitalizeName(customerName);
-          const formattedServiceName = capitalizeName(serviceName);
-          const formattedEmployeeName = capitalizeName(employeeName);
-
-          // Randevu sırasını belirle
-          const appointmentNumber = index + 1;
-          let appointmentText = '';
-          if (appointmentNumber === 1) {
-            appointmentText = '1. randevusunu aldı';
-          } else if (appointmentNumber === 2) {
-            appointmentText = '2. randevusunu aldı';
-          } else if (appointmentNumber === 3) {
-            appointmentText = '3. randevusunu aldı';
-          } else {
-            appointmentText = `${appointmentNumber}. randevusunu aldı`;
-          }
-
-          activities.push({
-            id: appointment.id,
-            type: 'appointment',
-            description: `${formattedCustomerName} ${appointmentText}`,
-            details: `${formattedServiceName} (${formattedEmployeeName})`,
-            timestamp: new Date(appointment.created_at).toLocaleDateString('tr-TR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            }),
-            created_at: appointment.created_at
-          });
-        });
+      const activities = await dashboardApi.getActivities();
+      if (activities && Array.isArray(activities)) {
+        setRecentActivities(activities.map(activity => ({
+          id: activity.id,
+          type: activity.type,
+          description: activity.description,
+          details: activity.details || '',
+          timestamp: activity.timestamp || activity.created_at,
+          created_at: activity.created_at || activity.timestamp,
+        })));
+      } else {
+        setRecentActivities([]);
       }
-
-      // Get recent customers
-      const { data: recentCustomers } = await supabase
-        .from('customers')
-        .select('id, name, created_at')
-        .eq('salon_id', salonId)
-        .order('created_at', { ascending: false })
-        .limit(2);
-
-      if (recentCustomers) {
-        recentCustomers.forEach((customer: any) => {
-          const formattedName = capitalizeName(customer.name);
-          activities.push({
-            id: customer.id,
-            type: 'customer',
-            description: `${formattedName} müşteri olarak eklendi`,
-            details: 'Yeni müşteri kaydı oluşturuldu',
-            timestamp: new Date(customer.created_at).toLocaleDateString('tr-TR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            }),
-            created_at: customer.created_at
-          });
-        });
-      }
-
-      // Get recent employees
-      const { data: recentEmployees } = await supabase
-        .from('employees')
-        .select('id, name, position, created_at')
-        .eq('salon_id', salonId)
-        .order('created_at', { ascending: false })
-        .limit(2);
-
-      if (recentEmployees) {
-        recentEmployees.forEach((employee: any) => {
-          const formattedName = capitalizeName(employee.name);
-          const formattedPosition = capitalizeName(employee.position);
-          activities.push({
-            id: employee.id,
-            type: 'employee',
-            description: `${formattedName} çalışan olarak eklendi`,
-            details: `Pozisyon: ${formattedPosition}`,
-            timestamp: new Date(employee.created_at).toLocaleDateString('tr-TR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            }),
-            created_at: employee.created_at
-          });
-        });
-      }
-
-      // Get recent services
-      const { data: recentServices } = await supabase
-        .from('services')
-        .select('id, name, price, created_at')
-        .eq('salon_id', salonId)
-        .order('created_at', { ascending: false })
-        .limit(2);
-
-      if (recentServices) {
-        recentServices.forEach((service: any) => {
-          const formattedName = capitalizeName(service.name);
-          activities.push({
-            id: service.id,
-            type: 'service',
-            description: `${formattedName} hizmeti eklendi`,
-            details: `Fiyat: ${service.price} TL`,
-            timestamp: new Date(service.created_at).toLocaleDateString('tr-TR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            }),
-            created_at: service.created_at
-          });
-        });
-      }
-
-      // Sort all activities by creation date (most recent first) and take the most recent 5
-      const sortedActivities = activities
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5);
-
-      setRecentActivities(sortedActivities);
     } catch (error) {
       console.error('Error loading recent activities:', error);
+      setRecentActivities([]);
     }
   };
 
   const loadNotifications = async (salonId: string) => {
     try {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      
-      const [newCustomers, newAppointments] = await Promise.all([
-        supabase
-          .from('customers')
-          .select('id, name, created_at')
-          .eq('salon_id', salonId)
-          .gte('created_at', yesterday.toISOString())
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('appointments')
-          .select('id, created_at, customers(name)')
-          .eq('salon_id', salonId)
-          .gte('created_at', yesterday.toISOString())
-          .order('created_at', { ascending: false })
-      ]);
-
-      const notificationsList: Notification[] = [];
-
-      newCustomers.data?.forEach((customer: any) => {
-        notificationsList.push({
-          id: `customer-${customer.id}`,
-          type: 'new_customer',
-          title: 'Yeni Müşteri',
-          message: `${capitalizeName(customer.name)} müşteri olarak eklendi`,
-          created_at: customer.created_at,
-          target_id: customer.id
-        });
-      });
-
-      newAppointments.data?.forEach((appointment: any) => {
-        const customerName = appointment.customers?.name || 'Bilinmeyen Müşteri';
-        notificationsList.push({
-          id: `appointment-${appointment.id}`,
-          type: 'new_appointment',
-          title: 'Yeni Randevu',
-          message: `${capitalizeName(customerName)} için yeni randevu oluşturuldu`,
-          created_at: appointment.created_at,
-          target_id: appointment.id
-        });
-      });
-
-      setNotifications(notificationsList);
+      // TODO: Implement notifications loading with new backend
+      setNotifications([]);
     } catch (error) {
       console.error('Error loading notifications:', error);
     }
@@ -452,51 +276,9 @@ export default function DashboardPage() {
 
   const loadChartData = async (salonId: string) => {
     try {
-      // Haftalık randevu verisi
-      const weekDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-      const weekData = [0, 0, 0, 0, 0, 0, 0];
-      
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - 7);
-      
-      const { data: weeklyAppointments } = await supabase
-        .from('appointments')
-        .select('start_time')
-        .eq('salon_id', salonId)
-        .gte('start_time', weekStart.toISOString());
-
-      weeklyAppointments?.forEach(apt => {
-        const day = new Date(apt.start_time).getDay();
-        weekData[day] = (weekData[day] || 0) + 1;
-      });
-
-      setWeeklyData({
-        labels: weekDays,
-        data: weekData,
-        colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16']
-      });
-
-      // Hizmet bazlı veri
-      const { data: serviceStats } = await supabase
-        .from('appointments')
-        .select('*, services(name)')
-        .eq('salon_id', salonId);
-
-      const serviceCounts: { [key: string]: number } = {};
-      serviceStats?.forEach(apt => {
-        const serviceName = (apt.services as any)?.name || 'Bilinmeyen';
-        serviceCounts[serviceName] = (serviceCounts[serviceName] || 0) + 1;
-      });
-
-      const serviceLabels = Object.keys(serviceCounts);
-      const serviceData = Object.values(serviceCounts);
-      const serviceColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16'];
-
-      setServiceData({
-        labels: serviceLabels,
-        data: serviceData,
-        colors: serviceColors.slice(0, serviceLabels.length)
-      });
+      // TODO: Implement chart data loading with new backend
+      setWeeklyData({ labels: [], data: [], colors: [] });
+      setServiceData({ labels: [], data: [], colors: [] });
     } catch (error) {
       console.error('Error loading chart data:', error);
     }
@@ -504,54 +286,8 @@ export default function DashboardPage() {
 
   const loadAppointmentNotifications = async (salonId: string) => {
     try {
-      // Bugün ve yarın için randevuları al
-      const today = new Date();
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      
-      const { data: upcomingAppointments } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          start_time,
-          status,
-          customers(name),
-          services(name),
-          employees(name)
-        `)
-        .eq('salon_id', salonId)
-        .in('status', ['confirmed', 'pending'])
-        .gte('start_time', today.toISOString().split('T')[0])
-        .lt('start_time', tomorrow.toISOString().split('T')[0])
-        .order('start_time', { ascending: true });
-
-      const notifications: AppointmentNotification[] = [];
-
-      upcomingAppointments?.forEach((apt: any) => {
-        const appointmentTime = new Date(apt.start_time);
-        const now = new Date();
-        const timeDiff = appointmentTime.getTime() - now.getTime();
-        const hoursUntilAppointment = timeDiff / (1000 * 60 * 60);
-
-        // Sadece 2 saat içinde başlayacak randevuları göster
-        if (hoursUntilAppointment >= 0 && hoursUntilAppointment <= 2) {
-          notifications.push({
-            id: apt.id,
-            customerName: apt.customers?.name || 'Bilinmeyen Müşteri',
-            serviceName: apt.services?.name || 'Bilinmeyen Hizmet',
-            employeeName: apt.employees?.name || 'Bilinmeyen Çalışan',
-            appointmentTime: appointmentTime.toLocaleTimeString('tr-TR', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }),
-            appointmentDate: appointmentTime.toLocaleDateString('tr-TR'),
-            status: apt.status,
-            salonId: salonId
-          });
-        }
-      });
-
-      setAppointmentNotifications(notifications);
+      // TODO: Implement appointment notifications loading with new backend
+      setAppointmentNotifications([]);
     } catch (error) {
       console.error('Error loading appointment notifications:', error);
     }
@@ -559,25 +295,10 @@ export default function DashboardPage() {
 
   const handleAppointmentConfirm = async (appointmentId: string) => {
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'completed' })
-        .eq('id', appointmentId);
-
-      if (error) {
-        console.error('Error confirming appointment:', error);
-        return;
-      }
-
-      // Bildirimi listeden kaldır
+      // TODO: Implement appointment confirmation with new backend
       setAppointmentNotifications(prev => 
         prev.filter(notification => notification.id !== appointmentId)
       );
-
-      // İstatistikleri yenile
-      if (user) {
-        await loadDashboardData(user.id);
-      }
     } catch (error) {
       console.error('Error confirming appointment:', error);
     }
@@ -585,83 +306,26 @@ export default function DashboardPage() {
 
   const loadQuickAppointmentData = async (salonId: string) => {
     try {
-      const [customersRes, servicesRes, employeesRes] = await Promise.all([
-        supabase.from('customers').select('*').eq('salon_id', salonId),
-        supabase.from('services').select('*').eq('salon_id', salonId),
-        supabase.from('employees').select('*').eq('salon_id', salonId)
+      const [customersData, servicesData, employeesData] = await Promise.all([
+        customersApi.getAll(),
+        servicesApi.getAll(),
+        employeesApi.getAll(),
       ]);
-
-      setCustomers(customersRes.data || []);
-      setServices(servicesRes.data || []);
-      setEmployees(employeesRes.data || []);
-      
-      // Müşteri kazanç verilerini yükle
-      await loadCustomerEarnings(salonId);
+      setCustomers(customersData || []);
+      setServices(servicesData || []);
+      setEmployees(employeesData || []);
     } catch (error) {
       console.error('Error loading quick appointment data:', error);
+      setCustomers([]);
+      setServices([]);
+      setEmployees([]);
     }
   };
 
   const loadCustomerEarnings = async (salonId: string) => {
     try {
-      // Müşteri bazlı randevu ve kazanç verilerini al
-      const { data: appointments } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          customer_id,
-          service_id,
-          start_time,
-          status,
-          customers(name),
-          services(name, price)
-        `)
-        .eq('salon_id', salonId)
-        .eq('status', 'completed');
-
-      if (appointments) {
-        // Müşteri bazlı verileri grupla
-        const customerStats: { [key: string]: any } = {};
-        
-        appointments.forEach((appointment: any) => {
-          const customerId = appointment.customer_id;
-          const customerName = appointment.customers?.name || 'Bilinmeyen Müşteri';
-          const servicePrice = (appointment.services as any)?.price || 0;
-          const appointmentDate = new Date(appointment.start_time);
-
-          if (!customerStats[customerId]) {
-            customerStats[customerId] = {
-              id: customerId,
-              name: customerName,
-              totalAppointments: 0,
-              totalEarnings: 0,
-              lastAppointment: null,
-              averageEarnings: 0
-            };
-          }
-
-          customerStats[customerId].totalAppointments += 1;
-          customerStats[customerId].totalEarnings += servicePrice;
-          
-          if (!customerStats[customerId].lastAppointment || 
-              appointmentDate > new Date(customerStats[customerId].lastAppointment)) {
-            customerStats[customerId].lastAppointment = appointment.start_time;
-          }
-        });
-
-        // Ortalama kazançları hesapla
-        Object.values(customerStats).forEach((customer: any) => {
-          customer.averageEarnings = customer.totalAppointments > 0 
-            ? customer.totalEarnings / customer.totalAppointments 
-            : 0;
-        });
-
-        // Kazanca göre sırala
-        const sortedCustomers = Object.values(customerStats)
-          .sort((a: any, b: any) => b.totalEarnings - a.totalEarnings);
-
-        setCustomerEarnings(sortedCustomers);
-      }
+      // TODO: Implement customer earnings loading with new backend
+      setCustomerEarnings([]);
     } catch (error) {
       console.error('Error loading customer earnings:', error);
     }
@@ -669,7 +333,7 @@ export default function DashboardPage() {
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      removeToken();
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -716,67 +380,8 @@ export default function DashboardPage() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) {
-        alert('Salon profili bulunamadı!');
-        return;
-      }
-
-      // Find customer by name or create new one
-      let customerId = selectedCustomer?.id;
-      if (!customerId) {
-        // Create new customer
-        const { data: newCustomer, error: customerError } = await supabase
-          .from('customers')
-          .insert({
-            salon_id: profile.id,
-            name: capitalizeName(quickAppointmentData.customerName),
-            phone: quickAppointmentData.customerPhone || null,
-            email: null,
-            notes: null
-          })
-          .select()
-          .single();
-
-        if (customerError) {
-          console.error('Error creating customer:', customerError);
-          alert('Müşteri oluşturulurken hata oluştu!');
-          return;
-        }
-        customerId = newCustomer.id;
-      }
-
-      // Create appointment
-      const startTime = new Date(`${quickAppointmentData.date}T${quickAppointmentData.time}`);
-      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour default
-
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert({
-          salon_id: profile.id,
-          customer_id: customerId,
-          service_id: quickAppointmentData.service,
-          employee_id: quickAppointmentData.employee || null,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          status: 'scheduled',
-          notes: null
-        })
-        .select()
-        .single();
-
-      if (appointmentError) {
-        console.error('Error creating appointment:', appointmentError);
-        alert('Randevu oluşturulurken hata oluştu!');
-        return;
-      }
-
-      alert('Randevu başarıyla oluşturuldu!');
+      // TODO: Implement quick appointment creation with new backend
+      alert('Backend entegrasyonu henüz tamamlanmadı');
       
       // Reset form
       setQuickAppointmentData({
@@ -790,9 +395,6 @@ export default function DashboardPage() {
       setSelectedCustomer(null);
       setCustomerSearchTerm('');
       setShowQuickAppointment(false);
-      
-      // Refresh dashboard data
-      await loadDashboardData(user.id);
     } catch (error) {
       console.error('Error creating appointment:', error);
       alert('Randevu oluşturulurken hata oluştu!');
@@ -804,41 +406,11 @@ export default function DashboardPage() {
     try {
       if (!user) return;
       
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) {
-        alert('Salon profili bulunamadı!');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('customers')
-        .insert({
-          salon_id: profile.id,
-          name: capitalizeName(quickCustomerData.name),
-          phone: quickCustomerData.phone,
-          email: quickCustomerData.email || null,
-          notes: quickCustomerData.notes || null
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding customer:', error);
-        alert('Müşteri eklenirken hata oluştu!');
-        return;
-      }
-
-      alert('Müşteri başarıyla eklendi!');
+      // TODO: Implement quick customer creation with new backend
+      alert('Backend entegrasyonu henüz tamamlanmadı');
+      
       setQuickCustomerData({ name: '', phone: '', email: '', notes: '' });
       setShowQuickCustomer(false);
-      
-      // Refresh dashboard data
-      await loadDashboardData(user.id);
     } catch (error) {
       console.error('Error adding customer:', error);
       alert('Müşteri eklenirken hata oluştu!');
@@ -850,43 +422,11 @@ export default function DashboardPage() {
     try {
       if (!user) return;
       
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) {
-        alert('Salon profili bulunamadı!');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('employees')
-        .insert({
-          salon_id: profile.id,
-          name: capitalizeName(quickEmployeeData.name),
-          position: capitalizeName(quickEmployeeData.position),
-          phone: quickEmployeeData.phone,
-          email: quickEmployeeData.email,
-          specialties: quickEmployeeData.specialties,
-          work_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding employee:', error);
-        alert('Çalışan eklenirken hata oluştu!');
-        return;
-      }
-
-      alert('Çalışan başarıyla eklendi!');
+      // TODO: Implement quick employee creation with new backend
+      alert('Backend entegrasyonu henüz tamamlanmadı');
+      
       setQuickEmployeeData({ name: '', position: '', phone: '', email: '', specialties: [] });
       setShowQuickEmployee(false);
-      
-      // Refresh dashboard data
-      await loadDashboardData(user.id);
     } catch (error) {
       console.error('Error adding employee:', error);
       alert('Çalışan eklenirken hata oluştu!');
@@ -898,41 +438,11 @@ export default function DashboardPage() {
     try {
       if (!user) return;
       
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) {
-        alert('Salon profili bulunamadı!');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('services')
-        .insert({
-          salon_id: profile.id,
-          name: capitalizeName(quickServiceData.name),
-          price: parseFloat(quickServiceData.price),
-          duration: parseInt(quickServiceData.duration),
-          description: quickServiceData.description || null
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding service:', error);
-        alert('Hizmet eklenirken hata oluştu!');
-        return;
-      }
-
-      alert('Hizmet başarıyla eklendi!');
+      // TODO: Implement quick service creation with new backend
+      alert('Backend entegrasyonu henüz tamamlanmadı');
+      
       setQuickServiceData({ name: '', price: '', duration: '', description: '' });
       setShowQuickService(false);
-      
-      // Refresh dashboard data
-      await loadDashboardData(user.id);
     } catch (error) {
       console.error('Error adding service:', error);
       alert('Hizmet eklenirken hata oluştu!');
@@ -959,7 +469,66 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-white">Sevim Kuaför</h1>
+              {/* Salon Selector */}
+              <div className="relative salon-dropdown">
+                <button
+                  onClick={() => setShowSalonDropdown(!showSalonDropdown)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                >
+                  <Building className="w-4 h-4 text-gray-300" />
+                  <span className="text-white font-medium">
+                    {user?.salonProfiles?.find(sp => sp.id === getCurrentSalonId())?.name || 
+                     user?.salonProfiles?.[0]?.name || 'Salon'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-300" />
+                </button>
+                
+                {showSalonDropdown && user?.salonProfiles && (
+                  <div className="absolute left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999]">
+                    <div className="py-2">
+                      <div className="px-4 py-2 border-b border-gray-700">
+                        <div className="text-xs text-gray-400 mb-1">Aktif Salon</div>
+                        <div className="text-sm text-white font-medium">
+                          {user.salonProfiles.find(sp => sp.id === getCurrentSalonId())?.name || 
+                           user.salonProfiles[0]?.name}
+                        </div>
+                      </div>
+                      {user.salonProfiles.map((salon) => (
+                        <button
+                          key={salon.id}
+                          onClick={() => {
+                            setCurrentSalonId(salon.id);
+                            setShowSalonDropdown(false);
+                            window.location.reload();
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                            getCurrentSalonId() === salon.id
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-300 hover:bg-gray-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{salon.name}</span>
+                            {getCurrentSalonId() === salon.id && (
+                              <span className="text-xs">✓</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                      <div className="border-t border-gray-700 mt-2 pt-2">
+                        <Link
+                          href="/salons"
+                          onClick={() => setShowSalonDropdown(false)}
+                          className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                        >
+                          <Settings className="w-4 h-4" />
+                          <span>Salon Yönetimi</span>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               <span className="text-gray-400">|</span>
               <span className="text-gray-300">Yönetim Paneli</span>
             </div>
@@ -1053,6 +622,13 @@ export default function DashboardPage() {
                       >
                         Hizmetler
                       </button>
+                      <button
+                        onClick={() => router.push('/salons')}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        <Building className="w-4 h-4 inline mr-2" />
+                        Salon Yönetimi
+                      </button>
                       <div className="border-t border-gray-700 mt-2 pt-2">
               <button
                 onClick={handleSignOut}
@@ -1079,7 +655,7 @@ export default function DashboardPage() {
               Hoş Geldiniz
           </h1>
             <p className="text-gray-300 text-center mt-2">
-              Sevim Kuaför Salonunuzun Yönetim Paneli
+              {user?.salonProfiles?.[0]?.name || 'Salon'} Salonunuzun Yönetim Paneli
           </p>
           </div>
         </div>

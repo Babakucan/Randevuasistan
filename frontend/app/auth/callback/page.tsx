@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { auth } from '@/lib/supabase'
 import { Calendar } from 'lucide-react'
 
 export default function AuthCallbackPage() {
@@ -14,21 +13,9 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const { data, error } = await auth.getSession()
-        
-        if (error) {
-          setError('Kimlik doğrulama hatası: ' + error.message)
-          setLoading(false)
-          return
-        }
-
-        if (data.session) {
-          // Successfully authenticated, redirect to dashboard
-          router.push('/dashboard')
-        } else {
-          setError('Oturum bulunamadı')
-          setLoading(false)
-        }
+        // TODO: Implement auth callback with new backend
+        setError('Backend entegrasyonu henüz tamamlanmadı')
+        setLoading(false)
       } catch (err) {
         setError('Beklenmeyen bir hata oluştu')
         setLoading(false)

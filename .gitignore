@@ -103,3 +103,23 @@ temp/
 
 # Local Netlify folder
 .netlify
+
+# Old Supabase SQL files (V1)
+*.sql
+!backend/prisma/schema.prisma
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Test files (optional)
+test/
+tests/
+*.test.ts
+*.test.js
+
+# Temporary files
+*.tmp
+*.temp
+deneme.txt

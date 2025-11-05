@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Users, MessageCircle, Phone, LogOut, User, ArrowLeft, Edit, Trash2, Mail, Clock, MapPin, Download } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
+// TODO: Import API service from new backend
 
 export default function PhoneCallDetailPage() {
   const router = useRouter()

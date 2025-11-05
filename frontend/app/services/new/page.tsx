@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Settings, ArrowLeft, Save } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
 import { capitalizeName } from '@/lib/utils'
+import { authApi, servicesApi, getToken, removeToken } from '@/lib/api'
 
 export default function NewServicePage() {
   const router = useRouter()
@@ -26,17 +26,22 @@ export default function NewServicePage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await auth.getCurrentUser()
-      if (!user) {
-        router.push('/login')
-        return
+      const token = getToken();
+      if (!token) {
+        router.push('/login');
+        setLoading(false);
+        return;
       }
-      setUser(user)
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+      }
     } catch (error) {
-      console.error('Auth error:', error)
-      router.push('/login')
+      console.error('Auth error:', error);
+      removeToken();
+      router.push('/login');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -58,28 +63,16 @@ export default function NewServicePage() {
 
     setSubmitting(true)
     try {
-      // Check if salon profile exists, create if not
-      let { data: salonProfile } = await db.getSalonProfile(user.id)
-      
-      if (!salonProfile) {
-        // Create default salon profile
-        const { data: newProfile } = await db.createSalonProfile(user.id, {
-          salonName: 'Güzellik Salonu',
-          name: user.email?.split('@')[0] || 'Salon Sahibi',
-          phone: '+90 555 000 0000',
-          email: user.email || 'salon@example.com'
-        })
-        salonProfile = newProfile?.[0]
+      const serviceData = {
+        name: formData.name,
+        duration: parseInt(formData.duration) || 0,
+        price: parseFloat(formData.price) || 0,
+        description: formData.description
       }
 
-      const result = await db.createService(user.id, {
-        name: formData.name,
-        duration: parseInt(formData.duration),
-        price: parseFloat(formData.price),
-        description: formData.description
-      })
+      const result = await servicesApi.create(serviceData)
 
-      if (result.data) {
+      if (result) {
         alert('Hizmet başarıyla oluşturuldu!')
         router.push('/services')
       } else {

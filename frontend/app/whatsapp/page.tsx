@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+// TODO: Import API service from new backend
 import { capitalizeName } from '@/lib/utils';
 import { 
   MessageSquare, 
