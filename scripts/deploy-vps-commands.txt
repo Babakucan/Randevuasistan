@@ -1,0 +1,146 @@
+# VPS Deployment Komutları
+# Bu komutları SSH ile VPS'e bağlandıktan sonra sırayla çalıştırın
+
+# 1. Sistem güncellemesi
+sudo apt update && sudo apt upgrade -y
+
+# 2. Node.js kurulumu
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# 3. PostgreSQL kurulumu
+sudo apt install postgresql postgresql-contrib -y
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# 4. Database oluşturma (Şifreyi değiştirin!)
+sudo -u postgres psql << EOF
+DROP DATABASE IF EXISTS randevuasistan_db;
+DROP USER IF EXISTS randevuasistan;
+CREATE USER randevuasistan WITH PASSWORD 'RandevuAsistan2025!';
+CREATE DATABASE randevuasistan_db OWNER randevuasistan;
+GRANT ALL PRIVILEGES ON DATABASE randevuasistan_db TO randevuasistan;
+\q
+EOF
+
+# 5. Nginx kurulumu
+sudo apt install nginx -y
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# 6. PM2 kurulumu
+sudo npm install -g pm2
+
+# 7. Proje klonlama
+cd /var/www
+sudo rm -rf Randevuasistan
+sudo git clone https://github.com/Babakucan/Randevuasistan.git
+sudo chown -R $USER:$USER Randevuasistan
+cd Randevuasistan
+
+# 8. Backend kurulumu
+cd backend
+npm install
+npm run build
+
+# 9. Backend .env dosyası oluşturma
+cat > .env << 'ENVFILE'
+PORT=3001
+NODE_ENV=production
+DATABASE_URL="postgresql://randevuasistan:RandevuAsistan2025!@localhost:5432/randevuasistan_db?schema=public"
+JWT_SECRET="$(openssl rand -base64 32)"
+JWT_EXPIRES_IN=7d
+CORS_ORIGIN=http://72.61.89.17
+OPENAI_API_KEY=""
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+ENVFILE
+
+# JWT_SECRET oluştur
+JWT_SECRET=$(openssl rand -base64 32)
+sed -i "s|JWT_SECRET=.*|JWT_SECRET=\"$JWT_SECRET\"|" .env
+
+# 10. Prisma setup
+npx prisma generate
+npx prisma db push
+
+# 11. Frontend kurulumu
+cd ../frontend
+npm install
+npm run build
+
+# 12. Frontend .env.local dosyası
+cat > .env.local << 'ENVFILE'
+NEXT_PUBLIC_API_URL=http://72.61.89.17/api
+ENVFILE
+
+# 13. PM2 ile backend başlatma
+cd ../backend
+pm2 delete randevuasistan-backend 2>/dev/null || true
+pm2 start dist/index.js --name randevuasistan-backend
+pm2 save
+
+# 14. PM2 ile frontend başlatma
+cd ../frontend
+pm2 delete randevuasistan-frontend 2>/dev/null || true
+pm2 start npm --name randevuasistan-frontend -- start
+pm2 save
+
+# 15. PM2 startup
+pm2 startup
+
+# 16. Nginx config oluşturma
+sudo tee /etc/nginx/sites-available/randevuasistan > /dev/null << 'NGINXCONF'
+server {
+    listen 80;
+    server_name 72.61.89.17;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+NGINXCONF
+
+# 17. Nginx config aktif etme
+sudo ln -sf /etc/nginx/sites-available/randevuasistan /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+
+# 18. Firewall ayarları
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+
+# 19. Kontrol
+echo "✅ Deployment tamamlandı!"
+echo ""
+echo "📊 PM2 Durumu:"
+pm2 status
+echo ""
+echo "🌐 Erişim:"
+echo "  Frontend: http://72.61.89.17"
+echo "  Backend API: http://72.61.89.17/api"
+echo "  Health Check: http://72.61.89.17/api/health"
+
