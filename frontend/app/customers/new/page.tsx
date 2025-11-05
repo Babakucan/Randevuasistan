@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, ArrowLeft, Save } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
 import { capitalizeName } from '@/lib/utils'
+import { authApi, customersApi, getToken, removeToken } from '@/lib/api'
 
 export default function NewCustomerPage() {
   const router = useRouter()
@@ -25,17 +25,22 @@ export default function NewCustomerPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await auth.getCurrentUser()
-      if (!user) {
-        router.push('/login')
-        return
+      const token = getToken();
+      if (!token) {
+        router.push('/login');
+        setLoading(false);
+        return;
       }
-      setUser(user)
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+      }
     } catch (error) {
-      console.error('Auth error:', error)
-      router.push('/login')
+      console.error('Auth error:', error);
+      removeToken();
+      router.push('/login');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -51,23 +56,16 @@ export default function NewCustomerPage() {
 
     setSubmitting(true)
     try {
-      // Check if salon profile exists, create if not
-      let { data: salonProfile } = await db.getSalonProfile(user.id)
-      
-      if (!salonProfile) {
-        // Create default salon profile
-        const { data: newProfile } = await db.createSalonProfile(user.id, {
-          salonName: 'Güzellik Salonu',
-          name: user.email?.split('@')[0] || 'Salon Sahibi',
-          phone: '+90 555 000 0000',
-          email: user.email || 'salon@example.com'
-        })
-        salonProfile = newProfile?.[0]
+      const customerData = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || '',
+        notes: ''
       }
 
-      const result = await db.createCustomer(user.id, formData)
+      const result = await customersApi.create(customerData)
 
-      if (result.data) {
+      if (result) {
         alert('Müşteri başarıyla oluşturuldu!')
         router.push('/customers')
       } else {

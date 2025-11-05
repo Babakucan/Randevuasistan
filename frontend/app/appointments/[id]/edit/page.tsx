@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Users, Clock, ArrowLeft, Save } from 'lucide-react'
-import { auth, db, employees, supabase } from '@/lib/supabase'
+import { authApi, appointmentsApi, customersApi, servicesApi, employeesApi, getToken, removeToken } from '@/lib/api'
 
 export default function EditAppointmentPage() {
   const router = useRouter()
@@ -37,32 +37,36 @@ export default function EditAppointmentPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await auth.getCurrentUser()
-      if (!user) {
+      const token = getToken()
+      if (!token) {
         router.push('/login')
         return
       }
-      setUser(user)
-      await loadData(user.id)
+      const user = await authApi.getCurrentUser()
+      if (user) {
+        setUser(user)
+        await loadData()
+      }
     } catch (error) {
       console.error('Auth error:', error)
+      removeToken()
       router.push('/login')
     } finally {
       setLoading(false)
     }
   }
 
-  const loadData = async (userId: string) => {
+  const loadData = async () => {
     try {
       // Load appointment
-      const { data: appointmentData } = await db.getAppointmentById(userId, appointmentId)
+      const appointmentData = await appointmentsApi.getById(appointmentId)
       if (appointmentData) {
         setAppointment(appointmentData)
-        const appointmentDate = new Date(appointmentData.start_time)
+        const appointmentDate = new Date(appointmentData.startTime || appointmentData.start_time)
         setFormData({
-          customer_id: appointmentData.customer_id,
-          service_id: appointmentData.service_id,
-          employee_id: appointmentData.employee_id,
+          customer_id: appointmentData.customerId || appointmentData.customer_id || '',
+          service_id: appointmentData.serviceId || appointmentData.service_id || '',
+          employee_id: appointmentData.employeeId || appointmentData.employee_id || '',
           appointment_date: appointmentDate.toISOString().split('T')[0],
           appointment_time: appointmentDate.toTimeString().slice(0, 5),
           notes: appointmentData.notes || '',
@@ -71,16 +75,18 @@ export default function EditAppointmentPage() {
       }
 
       // Load customers
-      const { data: customersData } = await db.getCustomers(userId)
-      setCustomers(customersData || [])
+      const customersData = await customersApi.getAll()
+      setCustomers(Array.isArray(customersData) ? customersData : [])
 
       // Load services
-      const { data: servicesData } = await db.getServices(userId)
-      setServices(servicesData || [])
+      const servicesData = await servicesApi.getAll()
+      setServices(Array.isArray(servicesData) ? servicesData : [])
       
       // Load employees for the selected service
-      if (appointmentData?.service_id) {
-        await handleServiceChangeWithDate(appointmentData.service_id, appointmentDate.toISOString().split('T')[0])
+      if (appointmentData?.serviceId || appointmentData?.service_id) {
+        const serviceId = appointmentData.serviceId || appointmentData.service_id
+        const date = appointmentDate.toISOString().split('T')[0]
+        await handleServiceChangeWithDate(serviceId, date)
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -135,23 +141,19 @@ export default function EditAppointmentPage() {
     if (serviceId) {
       try {
         console.log('🚀 Getting all employees...')
-        const { data: allEmployees } = await employees.getEmployees(user.id)
+        const allEmployees = await employeesApi.getAll()
         console.log('✅ All employees:', allEmployees)
         
-        const { data: employeeServices } = await supabase
-          .from('employee_services')
-          .select('employee_id')
-          .eq('service_id', serviceId)
-        
-        console.log('✅ Employee services for this service:', employeeServices)
-        
+        // Service'e atanmış çalışanları filtrele
         let filteredEmployees = []
         
-        if (employeeServices && employeeServices.length > 0) {
-          const serviceEmployeeIds = employeeServices.map((item: any) => item.employee_id)
-          filteredEmployees = allEmployees?.filter((emp: any) => 
-            serviceEmployeeIds.includes(emp.id) && emp.is_active !== false
-          ) || []
+        if (allEmployees && Array.isArray(allEmployees)) {
+          filteredEmployees = allEmployees.filter((emp: any) => {
+            const hasService = emp.employeeServices?.some((es: any) => 
+              (es.service?.id || es.serviceId) === serviceId
+            )
+            return hasService && (emp.isActive !== false && emp.is_active !== false)
+          })
           console.log('✅ Filtered by service assignment:', filteredEmployees)
         } else {
           filteredEmployees = []
@@ -166,7 +168,7 @@ export default function EditAppointmentPage() {
           console.log('📅 Converted date to day name:', dayName)
           
           const employeesWithoutLeave = filteredEmployees.filter((employee: any) => {
-            const leaveDays = employee.leave_days || []
+            const leaveDays = employee.leaveDays || employee.leave_days || []
             console.log(`📋 Employee ${employee.name} leave_days:`, leaveDays)
             
             return !leaveDays.includes(dayName)
@@ -195,29 +197,27 @@ export default function EditAppointmentPage() {
     setSubmitting(true)
     try {
       const appointmentDateTime = new Date(`${formData.appointment_date}T${formData.appointment_time}`)
+      const selectedService = services.find(s => s.id === formData.service_id)
+      const endTime = selectedService?.duration 
+        ? new Date(appointmentDateTime.getTime() + selectedService.duration * 60000)
+        : new Date(appointmentDateTime.getTime() + 60 * 60000) // Default 60 minutes
       
-              const result = await supabase
-          .from('appointments')
-          .update({
-            customer_id: formData.customer_id,
-            service_id: formData.service_id,
-            employee_id: formData.employee_id,
-            start_time: appointmentDateTime.toISOString(),
-            notes: formData.notes,
-            status: formData.status
-          })
-          .eq('id', appointmentId)
-          .select()
+      await appointmentsApi.update(appointmentId, {
+        customerId: formData.customer_id,
+        serviceId: formData.service_id,
+        employeeId: formData.employee_id || undefined,
+        startTime: appointmentDateTime.toISOString(),
+        endTime: endTime.toISOString(),
+        notes: formData.notes || undefined,
+        status: formData.status
+      })
 
-      if (result.data) {
-        alert('Randevu başarıyla güncellendi!')
-        router.push('/appointments')
-      } else {
-        alert('Randevu güncellenirken hata oluştu.')
-      }
-    } catch (error) {
+      alert('Randevu başarıyla güncellendi!')
+      router.push('/appointments')
+    } catch (error: any) {
       console.error('Error updating appointment:', error)
-      alert('Randevu güncellenirken hata oluştu.')
+      const errorMessage = error?.message || 'Randevu güncellenirken hata oluştu.'
+      alert(errorMessage)
     } finally {
       setSubmitting(false)
     }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Users, ArrowLeft, Save } from 'lucide-react'
-import { auth, db, supabase } from '@/lib/supabase'
+import { authApi, customersApi, getToken, removeToken } from '@/lib/api'
 import { capitalizeName } from '@/lib/utils'
 
 export default function EditCustomerPage() {
@@ -29,25 +29,29 @@ export default function EditCustomerPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await auth.getCurrentUser()
-      if (!user) {
+      const token = getToken()
+      if (!token) {
         router.push('/login')
         return
       }
-      setUser(user)
-      await loadData(user.id)
+      const user = await authApi.getCurrentUser()
+      if (user) {
+        setUser(user)
+        await loadData()
+      }
     } catch (error) {
       console.error('Auth error:', error)
+      removeToken()
       router.push('/login')
     } finally {
       setLoading(false)
     }
   }
 
-  const loadData = async (userId: string) => {
+  const loadData = async () => {
     try {
       // Load customer
-      const { data: customerData } = await db.getCustomerById(userId, customerId)
+      const customerData = await customersApi.getById(customerId)
       if (customerData) {
         setCustomer(customerData)
         setFormData({
@@ -73,25 +77,18 @@ export default function EditCustomerPage() {
 
     setSubmitting(true)
     try {
-      const result = await supabase
-        .from('customers')
-        .update({
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email
-        })
-        .eq('id', customerId)
-        .select()
+      await customersApi.update(customerId, {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || undefined
+      })
 
-      if (result.data) {
-        alert('Müşteri başarıyla güncellendi!')
-        router.push('/customers')
-      } else {
-        alert('Müşteri güncellenirken hata oluştu.')
-      }
-    } catch (error) {
+      alert('Müşteri başarıyla güncellendi!')
+      router.push('/customers')
+    } catch (error: any) {
       console.error('Error updating customer:', error)
-      alert('Müşteri güncellenirken hata oluştu.')
+      const errorMessage = error?.message || 'Müşteri güncellenirken hata oluştu.'
+      alert(errorMessage)
     } finally {
       setSubmitting(false)
     }

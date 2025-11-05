@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Mail, Lock, Calendar, ArrowLeft } from 'lucide-react'
-import { auth } from '@/lib/supabase'
+import { authApi, setToken } from '@/lib/api'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -22,21 +22,17 @@ export default function LoginPage() {
     setError('')
     
     try {
-      const { data, error } = await auth.signIn(formData.email, formData.password)
+      const response = await authApi.login(formData.email, formData.password)
       
-      if (error) {
-        setError(error.message)
-        setIsLoading(false)
-        return
-      }
-      
-      if (data.user) {
+      if (response && response.token) {
+        setToken(response.token)
         router.push('/dashboard')
       } else {
-        setError('Giriş başarısız oldu')
+        setError('Giriş başarısız. Lütfen tekrar deneyin.')
       }
     } catch (err) {
-      setError('Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.')
+      const errorMessage = err instanceof Error ? err.message : 'Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.'
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }

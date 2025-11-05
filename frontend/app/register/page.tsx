@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Mail, Lock, User, Building, Phone, ArrowLeft, Calendar } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
+import { authApi, setToken, setCurrentSalonId } from '@/lib/api'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -41,28 +41,29 @@ export default function RegisterPage() {
     setIsLoading(true)
     
     try {
-      // Create user account
-      const { data, error } = await auth.signUp(formData.email, formData.password, {
+      const response = await authApi.register({
+        email: formData.email,
+        password: formData.password,
         name: formData.name,
-        phone: formData.phone,
-        salon_name: formData.salonName
+        salonName: formData.salonName,
+        phone: formData.phone || undefined,
       })
       
-      if (error) {
-        setError(error.message)
-        setIsLoading(false)
-        return
-      }
-      
-      if (data.user) {
-        if (data.session) {
-          router.push('/dashboard')
-        } else {
-          setSuccess('Hesabınız başarıyla oluşturuldu!')
+      if (response.token) {
+        setToken(response.token)
+        if (response.currentSalonId) {
+          setCurrentSalonId(response.currentSalonId)
         }
+        setSuccess('Hesabınız başarıyla oluşturuldu!')
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 1500)
+      } else {
+        setError('Hesap oluşturulurken bir hata oluştu.')
       }
     } catch (err) {
-      setError('Hesap oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.')
+      const errorMessage = err instanceof Error ? err.message : 'Hesap oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.'
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }

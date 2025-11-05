@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { capitalizeName } from '@/lib/utils';
+import { authApi, appointmentsApi, getToken, removeToken } from '@/lib/api';
 import { 
   Calendar, 
   Plus, 
@@ -76,48 +76,52 @@ export default function AppointmentsPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = getToken();
+      if (!token) {
         router.push('/login');
         return;
       }
-      setUser(user);
-      await loadAppointments(user.id);
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+        await loadAppointments();
+      }
     } catch (error) {
       console.error('Error checking user:', error);
+      removeToken();
       router.push('/login');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loadAppointments = async (userId: string) => {
+  const loadAppointments = async () => {
     try {
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (profile) {
-        const { data: appointmentsData } = await supabase
-          .from('appointments')
-          .select(`
-            id,
-            start_time,
-            end_time,
-            status,
-            notes,
-            created_at,
-            customers(name, phone),
-            employees(name),
-            services(name, price)
-          `)
-          .eq('salon_id', profile.id)
-          .order('start_time', { ascending: false });
-
-        if (appointmentsData) {
-          setAppointments(appointmentsData as unknown as Appointment[]);
-          setTotalPages(Math.ceil(appointmentsData.length / itemsPerPage));
-        }
+      const appointmentsData = await appointmentsApi.getAll();
+      
+      if (appointmentsData && Array.isArray(appointmentsData)) {
+        const formattedAppointments = appointmentsData.map((apt: any) => ({
+          id: apt.id,
+          start_time: apt.startTime || apt.start_time,
+          end_time: apt.endTime || apt.end_time,
+          status: apt.status || 'pending',
+          notes: apt.notes || '',
+          created_at: apt.created_at || apt.createdAt,
+          customers: apt.customer ? {
+            name: apt.customer.name,
+            phone: apt.customer.phone,
+          } : null,
+          employees: apt.employee ? {
+            name: apt.employee.name,
+          } : null,
+          services: apt.service ? {
+            name: apt.service.name,
+            price: apt.service.price,
+          } : null,
+        }));
+        
+        setAppointments(formattedAppointments);
+        setTotalPages(Math.ceil(formattedAppointments.length / itemsPerPage));
       }
     } catch (error) {
       console.error('Error loading appointments:', error);
@@ -187,12 +191,7 @@ export default function AppointmentsPage() {
     if (!confirm('Bu randevuyu silmek istediğinizden emin misiniz?')) return;
 
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .delete()
-        .eq('id', appointmentId);
-
-      if (error) throw error;
+      await appointmentsApi.delete(appointmentId);
 
       setAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
       alert('Randevu başarıyla silindi!');
@@ -319,7 +318,7 @@ export default function AppointmentsPage() {
                       <div className="border-t border-gray-700 mt-2 pt-2">
                         <button
                           onClick={async () => {
-                            await supabase.auth.signOut();
+                            removeToken();
                             router.push('/login');
                           }}
                           className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Users, MessageCircle, Phone, LogOut, User, ArrowLeft, Edit, Trash2, Mail, Clock, MapPin, CheckCircle, XCircle } from 'lucide-react'
-import { auth, db } from '@/lib/supabase'
+import { authApi, appointmentsApi, getToken, removeToken } from '@/lib/api'
 
 export default function AppointmentDetailPage() {
   const router = useRouter()
@@ -20,53 +20,46 @@ export default function AppointmentDetailPage() {
 
   const checkUser = async () => {
     try {
-      const { data: sessionData } = await auth.getSession()
-      
-      if (sessionData.session) {
-        setUser(sessionData.session.user)
-        await loadAppointmentData(sessionData.session.user.id)
+      const token = getToken();
+      if (!token) {
+        router.push('/login');
+        setLoading(false);
+        return;
+      }
+
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+        await loadAppointmentData();
       } else {
-        const { user: currentUser } = await auth.getCurrentUser()
-        if (currentUser) {
-          setUser(currentUser)
-          await loadAppointmentData(currentUser.id)
-        } else {
-          router.push('/login')
-          return
-        }
+        router.push('/login');
+        setLoading(false);
       }
     } catch (err) {
-      console.error('Auth check error:', err)
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
+      console.error('Auth check error:', err);
+      removeToken();
+      router.push('/login');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  const loadAppointmentData = async (userId: string) => {
+  const loadAppointmentData = async () => {
     try {
-      const { data: appointmentData, error: appointmentError } = await db.getAppointmentById(userId, appointmentId)
-
-      if (appointmentError) {
-        console.error('Error loading appointment:', appointmentError)
-        router.push('/appointments')
-        return
-      }
-
-      setAppointment(appointmentData)
+      const appointmentData = await appointmentsApi.getById(appointmentId);
+      setAppointment(appointmentData);
     } catch (error) {
-      console.error('Error loading appointment data:', error)
+      console.error('Error loading appointment data:', error);
+      router.push('/appointments');
     }
   }
 
   const handleSignOut = async () => {
     try {
-      await auth.signOut()
-      router.push('/')
+      removeToken();
+      router.push('/login');
     } catch (err) {
-      console.error('Sign out error:', err)
+      console.error('Sign out error:', err);
     }
   }
 
@@ -190,16 +183,16 @@ export default function AppointmentDetailPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">
-                  {appointment.services?.name}
+                  {appointment.service?.name || appointment.services?.name}
                 </h1>
                 <div className="flex items-center space-x-6 mt-2">
                   <div className="flex items-center space-x-2 text-gray-600">
                     <Clock className="w-4 h-4" />
-                    <span>{appointment.services?.duration} dakika</span>
+                    <span>{appointment.service?.duration || appointment.services?.duration} dakika</span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-600">
                     <span className="text-lg font-semibold text-green-600">
-                      {formatCurrency(appointment.services?.price || 0)}
+                      {formatCurrency(appointment.service?.price || appointment.services?.price || 0)}
                     </span>
                   </div>
                 </div>
@@ -214,7 +207,7 @@ export default function AppointmentDetailPage() {
                 <span>Düzenle</span>
               </button>
               <button
-                onClick={() => router.push(`/customers/${appointment.customer_id}`)}
+                onClick={() => router.push(`/customers/${appointment.customerId || appointment.customer_id}`)}
                 className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
               >
                 <Users className="w-4 h-4" />
@@ -272,13 +265,13 @@ export default function AppointmentDetailPage() {
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Tarih:</span>
                 <span className="font-medium">
-                  {new Date(appointment.appointment_date).toLocaleDateString('tr-TR')}
+                  {new Date(appointment.startTime || appointment.appointment_date).toLocaleDateString('tr-TR')}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Saat:</span>
                 <span className="font-medium">
-                  {new Date(appointment.appointment_date).toLocaleTimeString('tr-TR', { 
+                  {new Date(appointment.startTime || appointment.appointment_date).toLocaleTimeString('tr-TR', { 
                     hour: '2-digit', 
                     minute: '2-digit' 
                   })}
@@ -286,12 +279,12 @@ export default function AppointmentDetailPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Süre:</span>
-                <span className="font-medium">{appointment.services?.duration} dakika</span>
+                <span className="font-medium">{appointment.service?.duration || appointment.services?.duration} dakika</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Fiyat:</span>
                 <span className="font-medium text-green-600">
-                  {formatCurrency(appointment.services?.price || 0)}
+                  {formatCurrency(appointment.service?.price || appointment.services?.price || 0)}
                 </span>
               </div>
             </div>
@@ -327,7 +320,7 @@ export default function AppointmentDetailPage() {
               <span>Müşteri Profilini Görüntüle</span>
             </button>
             <button
-              onClick={() => router.push(`/appointments/new?customer=${appointment.customer_id}`)}
+              onClick={() => router.push(`/appointments/new?customer=${appointment.customerId || appointment.customer_id}`)}
               className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
             >
               <Calendar className="w-4 h-4" />

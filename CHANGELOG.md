@@ -1,0 +1,155 @@
+# 📝 Changelog - Randevu Asistan
+
+Tüm önemli değişiklikler bu dosyada dokümante edilmiştir.
+
+Format [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/) standardına göre,
+ve bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
+
+## [2.1.0] - Planlanan - Temizlik ve Optimizasyon
+
+### 🧹 Temizlik
+- Gereksiz SQL dosyalarının kaldırılması
+- Eski Supabase referanslarının temizlenmesi
+- Backup dosyalarının kaldırılması
+- Test dosyalarının düzenlenmesi
+
+### 🐛 Düzeltmeler
+- Çalışan düzenleme sayfası buton state yönetimi
+- Employee Service assignment endpoint implementasyonu
+- Phone Calls sayfası migration
+- WhatsApp sayfası migration
+
+### 📝 Dokümantasyon
+- ARCHITECTURE.md eklendi
+- V2_ROADMAP.md eklendi
+- CHANGELOG.md eklendi
+- DEPLOYMENT.md eklenecek
+- README.md güncellendi
+
+---
+
+## [2.0.0] - 2024 - Yeni Mimari
+
+### 🎉 Büyük Değişiklikler
+
+#### Backend Yeniden Yapılandırma
+- ✅ **Supabase → Express.js + Prisma**: Tamamen yeni backend mimarisi
+- ✅ **JWT Authentication**: Supabase Auth yerine JWT token sistemi
+- ✅ **PostgreSQL**: Standalone PostgreSQL veritabanı
+- ✅ **Prisma ORM**: Type-safe database queries
+- ✅ **REST API**: Custom REST API endpoints
+
+#### Frontend Entegrasyonu
+- ✅ **API Client**: Yeni backend için API client (`lib/api.ts`)
+- ✅ **Authentication Migration**: Supabase Auth → JWT
+- ✅ **Tüm Sayfalar Güncellendi**: Customers, Employees, Services, Appointments
+- ✅ **Detail Pages Migration**: Tüm detay sayfaları yeni API'ye geçirildi
+
+#### Multi-Tenant Özellikleri
+- ✅ **Çoklu Salon Desteği**: Bir kullanıcı birden fazla salon profili oluşturabilir
+- ✅ **Salon Seçici**: Dashboard'da salon değiştirme dropdown'ı
+- ✅ **Salon Yönetimi**: Salon CRUD işlemleri
+- ✅ **Otomatik Salon ID**: API isteklerinde otomatik salon ID ekleme
+
+### ✨ Yeni Özellikler
+
+#### Müşteri Yönetimi
+- ✅ **Aktif/Pasif Gösterimi**: Randevu geçmişine göre aktif müşteri tespiti
+- ✅ **Randevu Detayları**: Müşteri listesinde son randevu bilgileri
+- ✅ **Aktif Randevu Sayısı**: Her müşteri için aktif randevu sayısı
+
+#### Çalışan Yönetimi
+- ✅ **Performans Takibi**: Çalışan bazlı performans istatistikleri
+- ✅ **Çalışma Saatleri**: JSON formatında çalışma saatleri yönetimi
+- ✅ **İzin Günleri**: Array formatında izin günleri yönetimi
+- ✅ **Hizmet Atamaları**: Çalışan-hizmet ilişkisi
+
+#### Hizmet Yönetimi
+- ✅ **Performans Takibi**: Hizmet bazlı performans istatistikleri
+- ✅ **Detaylı İstatistikler**: Hizmet kartlarında performans metrikleri
+- ✅ **Performans Modal**: Detaylı performans analizi
+
+#### Randevu Yönetimi
+- ✅ **Akıllı Çalışan Filtreleme**: Seçilen hizmeti veren çalışanlar
+- ✅ **Müsaitlik Kontrolü**: Çalışma saatleri ve izin günleri kontrolü
+- ✅ **Otomatik End Time**: Hizmet süresine göre bitiş saati hesaplama
+
+### 🔧 Teknik İyileştirmeler
+
+#### Backend
+- ✅ **Error Handling**: Merkezi hata yönetimi middleware
+- ✅ **Validation**: Zod schema validation
+- ✅ **Type Safety**: Full TypeScript desteği
+- ✅ **Security**: JWT, bcrypt, helmet, CORS, rate limiting
+- ✅ **Database**: Prisma migrations ve type-safe queries
+
+#### Frontend
+- ✅ **Type Safety**: TypeScript ile tip güvenliği
+- ✅ **Error Handling**: API hatalarının kullanıcı dostu gösterimi
+- ✅ **Loading States**: Tüm sayfalarda loading state yönetimi
+- ✅ **Form Validation**: Client-side ve server-side validation
+
+### 📁 Dosya Yapısı
+
+#### Yeni Dosyalar
+- `backend/` - Yeni Express.js backend
+- `backend/src/` - Backend kaynak kodları
+- `backend/prisma/schema.prisma` - Prisma schema
+- `frontend/lib/api.ts` - API client
+- `ARCHITECTURE.md` - Mimari dokümantasyonu
+- `V2_ROADMAP.md` - Yol haritası
+- `CHANGELOG.md` - Bu dosya
+
+#### Silinen Dosyalar
+- `lib/supabase.ts` - Eski Supabase client
+- Eski Supabase referansları frontend'den kaldırıldı
+
+### 🐛 Bilinen Sorunlar
+
+#### Kalan Sorunlar
+- ⚠️ **Çalışan Düzenleme Butonu**: Kayıt sonrası buton state yönetimi (düzeltilecek V2.1'de)
+- ⚠️ **Employee Service Assignment**: Backend endpoint'i henüz yok (UI'da placeholder)
+- ⚠️ **Phone Calls Sayfası**: Eski Supabase referansları var
+- ⚠️ **WhatsApp Sayfası**: Eski Supabase referansları var
+
+### 📊 İstatistikler
+
+- **Backend Routes**: 7 ana route grubu (auth, customers, employees, services, appointments, dashboard, salons)
+- **API Endpoints**: 30+ endpoint
+- **Database Models**: 12 Prisma model
+- **Frontend Pages**: 15+ sayfa güncellendi
+- **Migration Dosyaları**: 0 (Prisma db push kullanıldı)
+
+---
+
+## [1.0.0] - Eski Versiyon - Supabase Tabanlı
+
+### Özellikler
+- Supabase Auth
+- Supabase Database
+- Supabase REST API
+- Tek salon profili
+- Temel CRUD işlemleri
+
+---
+
+## Gelecek Versiyonlar
+
+### [2.2.0] - Planlanan
+- AI entegrasyonları
+- Call management
+- Notification system
+
+### [3.0.0] - Planlanan
+- Production optimizasyonları
+- Monitoring & logging
+- Performance improvements
+- Mobile app
+
+---
+
+**Not:** Bu changelog otomatik güncellenmez. Her versiyon için manuel olarak güncellenmelidir.
+
+**Son Güncelleme:** V2.0.0  
+**Sonraki Versiyon:** V2.1.0
+

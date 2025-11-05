@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Users, Clock, ArrowLeft, Save, User } from 'lucide-react'
-import { auth, db, employees, supabase } from '@/lib/supabase'
 import { capitalizeName } from '@/lib/utils'
+import { authApi, appointmentsApi, customersApi, servicesApi, employeesApi, getToken, removeToken } from '@/lib/api'
 
 export default function NewAppointmentPage() {
   const router = useRouter()
@@ -53,35 +53,44 @@ export default function NewAppointmentPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await auth.getCurrentUser()
-      if (!user) {
-        router.push('/login')
-        return
+      const token = getToken();
+      if (!token) {
+        router.push('/login');
+        setLoading(false);
+        return;
       }
-      setUser(user)
-      await loadData(user.id)
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+        await loadData();
+      }
     } catch (error) {
-      console.error('Auth error:', error)
-      router.push('/login')
+      console.error('Auth error:', error);
+      removeToken();
+      router.push('/login');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  const loadData = async (userId: string) => {
+  const loadData = async () => {
     try {
       // Load customers
-      const { data: customersData } = await db.getCustomers(userId)
-      setCustomers(customersData || [])
+      const customersData = await customersApi.getAll();
+      if (customersData && Array.isArray(customersData)) {
+        setCustomers(customersData);
+      }
 
       // Load services
-      const { data: servicesData } = await db.getServices(userId)
-      setServices(servicesData || [])
+      const servicesData = await servicesApi.getAll();
+      if (servicesData && Array.isArray(servicesData)) {
+        setServices(servicesData);
+      }
       
       // Başlangıçta çalışanları yükleme - sadece hizmet seçildiğinde yüklenecek
-      setAvailableEmployees([])
+      setAvailableEmployees([]);
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading data:', error);
     }
   }
 
@@ -163,36 +172,29 @@ export default function NewAppointmentPage() {
       try {
         // Doğrudan tüm çalışanları getir
         console.log('🚀 Getting all employees...')
-        const { data: allEmployees } = await employees.getEmployees(user.id)
+        const allEmployees = await employeesApi.getAll()
         console.log('✅ All employees:', allEmployees)
         
-                 // Şimdi employee_services tablosundan bu hizmeti yapabilen çalışanları kontrol et
-         const { data: employeeServices } = await supabase
-           .from('employee_services')
-           .select('employee_id')
-           .eq('service_id', serviceId)
-         
-         console.log('✅ Employee services for this service:', employeeServices)
-         console.log('🔍 Service ID being searched:', serviceId)
-         
-         // Tüm employee_services kayıtlarını kontrol et
-         const { data: allEmployeeServices } = await supabase.from('employee_services').select('*')
-         console.log('🔍 All employee_services records:', allEmployeeServices)
-        
+        // Service'e atanmış çalışanları filtrele
         let filteredEmployees = []
         
-                 // Hizmet filtreleme - sadece bu hizmeti yapabilen çalışanları göster
-         if (employeeServices && employeeServices.length > 0) {
-           const serviceEmployeeIds = employeeServices.map((item: any) => item.employee_id)
-           filteredEmployees = allEmployees?.filter((emp: any) => 
-             serviceEmployeeIds.includes(emp.id) && emp.is_active !== false
-           ) || []
-           console.log('✅ Filtered by service assignment:', filteredEmployees)
-         } else {
-           // Bu hizmet için hiç çalışan atanmamış
-           filteredEmployees = []
-           console.log('❌ No employees assigned to this service')
-         }
+        if (allEmployees && Array.isArray(allEmployees)) {
+          filteredEmployees = allEmployees.filter((emp: any) => {
+            // Aktif olmalı
+            const isActive = emp.isActive !== false && emp.is_active !== false;
+            
+            // Bu hizmeti verebilmeli (employeeServices içinde olmalı)
+            const hasService = emp.employeeServices?.some((es: any) => 
+              (es.service?.id || es.serviceId) === serviceId
+            );
+            
+            return isActive && hasService;
+          });
+          console.log('✅ Filtered by service assignment:', filteredEmployees)
+        } else {
+          filteredEmployees = []
+          console.log('❌ No employees found')
+        }
          
          // Şimdi izin günlerini kontrol et
          const checkDate = appointmentDate || formData.appointment_date
@@ -204,7 +206,7 @@ export default function NewAppointmentPage() {
            console.log('📅 Converted date to day name:', dayName)
            
            const employeesWithoutLeave = filteredEmployees.filter((employee: any) => {
-             const leaveDays = employee.leave_days || []
+             const leaveDays = employee.leaveDays || employee.leave_days || []
              console.log(`📋 Employee ${employee.name} leave_days:`, leaveDays)
              
              // İzin günlerinde değilse true döndür
@@ -231,42 +233,51 @@ export default function NewAppointmentPage() {
     e.preventDefault()
     if (!user) return
 
+    // Form validasyonu
+    if (!formData.customer_id || !formData.service_id || !formData.appointment_date || !formData.appointment_time) {
+      alert('Lütfen tüm zorunlu alanları doldurun!')
+      return
+    }
+
     setSubmitting(true)
     try {
-      // Check if salon profile exists, create if not
-      let { data: salonProfile } = await db.getSalonProfile(user.id)
-      
-      if (!salonProfile) {
-        // Create default salon profile
-        const { data: newProfile } = await db.createSalonProfile(user.id, {
-          salonName: 'Güzellik Salonu',
-          name: user.email?.split('@')[0] || 'Salon Sahibi',
-          phone: '+90 555 000 0000',
-          email: user.email || 'salon@example.com'
-        })
-        salonProfile = newProfile?.[0]
-      }
-
       const appointmentDateTime = new Date(`${formData.appointment_date}T${formData.appointment_time}`)
       
-      const result = await db.createAppointment(user.id, {
-        customer_id: formData.customer_id,
-        service_id: formData.service_id,
-        employee_id: formData.employee_id,
-        appointment_date: appointmentDateTime.toISOString(),
-        notes: formData.notes,
-        status: formData.status
-      })
+      // Seçilen servisi bul ve süresini al
+      const selectedService = services.find(s => s.id === formData.service_id)
+      const serviceDuration = selectedService?.duration || 30 // Varsayılan 30 dakika
+      
+      // End time hesapla (start time + servis süresi)
+      const endDateTime = new Date(appointmentDateTime)
+      endDateTime.setMinutes(endDateTime.getMinutes() + serviceDuration)
+      
+      const appointmentData = {
+        customerId: formData.customer_id,
+        serviceId: formData.service_id,
+        employeeId: formData.employee_id || undefined,
+        startTime: appointmentDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        notes: formData.notes || undefined,
+        status: formData.status || 'scheduled',
+        source: 'manual' as const
+      }
 
-      if (result.data) {
+      const result = await appointmentsApi.create(appointmentData)
+
+      if (result) {
         alert('Randevu başarıyla oluşturuldu!')
         router.push('/appointments')
       } else {
         alert('Randevu oluşturulurken hata oluştu.')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating appointment:', error)
-      alert('Randevu oluşturulurken hata oluştu.')
+      // Validation hatalarını göster
+      if (error.message && error.message.includes('Validation')) {
+        alert(`Doğrulama hatası: ${error.message}`)
+      } else {
+        alert('Randevu oluşturulurken hata oluştu: ' + (error.message || 'Bilinmeyen hata'))
+      }
     } finally {
       setSubmitting(false)
     }

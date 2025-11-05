@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { capitalizeName } from '@/lib/utils';
+import { authApi, employeesApi, appointmentsApi, getToken, removeToken } from '@/lib/api';
 import { 
   Users, 
   Plus, 
@@ -76,38 +76,47 @@ export default function EmployeesPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = getToken();
+      if (!token) {
         router.push('/login');
         return;
       }
-      setUser(user);
-      await loadEmployees(user.id);
+      const user = await authApi.getCurrentUser();
+      if (user) {
+        setUser(user);
+        await loadEmployees();
+      }
     } catch (error) {
       console.error('Error checking user:', error);
+      removeToken();
       router.push('/login');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loadEmployees = async (userId: string) => {
+  const loadEmployees = async () => {
     try {
-      const { data: profile } = await supabase
-        .from('salon_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (profile) {
-        const { data: employeesData } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('salon_id', profile.id)
-          .order('created_at', { ascending: false });
-
-        if (employeesData) {
-          setEmployees(employeesData);
-          await loadEmployeeStats(employeesData, profile.id);
-        }
+      const employeesData = await employeesApi.getAll();
+      
+      if (employeesData && Array.isArray(employeesData)) {
+        const formattedEmployees = employeesData.map((emp: any) => ({
+          id: emp.id,
+          name: emp.name,
+          email: emp.email || '',
+          phone: emp.phone || '',
+          position: emp.position || '',
+          specialties: emp.specialties || '',
+          hourly_rate: emp.hourlyRate || emp.hourly_rate || 0,
+          bio: emp.bio || '',
+          experience_years: emp.experienceYears || emp.experience_years || 0,
+          is_active: emp.isActive !== undefined ? emp.isActive : emp.is_active !== false,
+          avatar_url: emp.avatarUrl || emp.avatar_url,
+          created_at: emp.created_at || emp.createdAt,
+        }));
+        
+        setEmployees(formattedEmployees);
+        await loadEmployeeStats(formattedEmployees);
       }
     } catch (error) {
       console.error('Error loading employees:', error);
@@ -116,62 +125,85 @@ export default function EmployeesPage() {
     }
   };
 
-  const loadEmployeeStats = async (employees: Employee[], salonId: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    const stats: { [key: string]: EmployeeStats } = {};
+  const loadEmployeeStats = async (employees: Employee[]) => {
+    try {
+      // Tüm randevuları çek
+      const allAppointments = await appointmentsApi.getAll();
+      
+      // Bugünün tarihini hesapla
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
-    for (const employee of employees) {
-      try {
-        // Bugünkü randevuları getir
-        const { data: appointments } = await supabase
-          .from('appointments')
-          .select('id, services(price)')
-          .eq('salon_id', salonId)
-          .eq('employee_id', employee.id)
-          .gte('start_time', `${today}T00:00:00`)
-          .lt('start_time', `${today}T23:59:59`);
+      const stats: { [key: string]: EmployeeStats } = {};
 
-        const todayAppointments = appointments?.length || 0;
-        const todayEarnings = appointments?.reduce((sum, apt) => sum + ((apt.services as any)?.price || 0), 0) || 0;
+      // Her çalışan için bugünkü randevuları filtrele
+      for (const employee of employees) {
+        const todayAppointments = allAppointments.filter((apt: any) => {
+          const appointmentDate = new Date(apt.startTime || apt.start_time);
+          return appointmentDate >= today && 
+                 appointmentDate < tomorrow && 
+                 (apt.employeeId || apt.employee_id) === employee.id &&
+                 apt.status !== 'cancelled';
+        });
+
+        const todayAppointmentsCount = todayAppointments.length;
+        const todayEarnings = todayAppointments.reduce((sum: number, apt: any) => {
+          const price = apt.service?.price || apt.services?.price || 0;
+          return sum + price;
+        }, 0);
 
         stats[employee.id] = {
-          todayAppointments,
+          todayAppointments: todayAppointmentsCount,
           todayEarnings
         };
-      } catch (error) {
-        console.error(`Error loading stats for employee ${employee.id}:`, error);
-        stats[employee.id] = { todayAppointments: 0, todayEarnings: 0 };
       }
-    }
 
-    setEmployeeStats(stats);
+      setEmployeeStats(stats);
+    } catch (error) {
+      console.error('Error loading employee stats:', error);
+      // Hata durumunda boş stats set et
+      const emptyStats: { [key: string]: EmployeeStats } = {};
+      employees.forEach(emp => {
+        emptyStats[emp.id] = { todayAppointments: 0, todayEarnings: 0 };
+      });
+      setEmployeeStats(emptyStats);
+    }
   };
 
   const loadPerformanceData = async (employeeId: string, salonId: string, date: string) => {
     try {
       const startDate = new Date(date);
       startDate.setDate(startDate.getDate() - 7); // Son 7 gün
+      startDate.setHours(0, 0, 0, 0);
 
-      const { data: appointments } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          start_time,
-          services(name, price),
-          customers(name)
-        `)
-        .eq('salon_id', salonId)
-        .eq('employee_id', employeeId)
-        .gte('start_time', startDate.toISOString())
-        .lte('start_time', `${date}T23:59:59`)
-        .order('start_time', { ascending: false });
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      // Tüm randevuları çek
+      const allAppointments = await appointmentsApi.getAll();
+      
+      // Son 7 günün randevularını filtrele
+      const appointments = allAppointments.filter((apt: any) => {
+        const appointmentDate = new Date(apt.startTime || apt.start_time);
+        return appointmentDate >= startDate && 
+               appointmentDate <= endDate && 
+               (apt.employeeId || apt.employee_id) === employeeId &&
+               apt.status !== 'cancelled';
+      }).sort((a: any, b: any) => {
+        const dateA = new Date(a.startTime || a.start_time).getTime();
+        const dateB = new Date(b.startTime || b.start_time).getTime();
+        return dateB - dateA; // En yeni önce
+      });
 
       if (appointments) {
         // Günlük performans verilerini grupla
         const dailyStats: { [key: string]: any } = {};
         
         appointments.forEach(apt => {
-          const day = new Date(apt.start_time).toISOString().split('T')[0];
+          const appointmentDate = apt.startTime || apt.start_time;
+          const day = new Date(appointmentDate).toISOString().split('T')[0];
           if (!dailyStats[day]) {
             dailyStats[day] = {
               date: day,
@@ -183,7 +215,8 @@ export default function EmployeesPage() {
           
           dailyStats[day].appointments.push(apt);
           dailyStats[day].totalAppointments += 1;
-          dailyStats[day].totalEarnings += (apt.services as any)?.price || 0;
+          const price = apt.service?.price || apt.services?.price || 0;
+          dailyStats[day].totalEarnings += price;
         });
 
         // Son 7 günü doldur (boş günler için)
@@ -219,12 +252,7 @@ export default function EmployeesPage() {
     if (!confirm('Bu çalışanı silmek istediğinizden emin misiniz?')) return;
 
     try {
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', employeeId);
-
-      if (error) throw error;
+      await employeesApi.delete(employeeId);
 
       setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
       alert('Çalışan başarıyla silindi!');
@@ -319,7 +347,7 @@ export default function EmployeesPage() {
                       <div className="border-t border-gray-700 mt-2 pt-2">
                         <button
                           onClick={async () => {
-                            await supabase.auth.signOut();
+                            removeToken();
                             router.push('/login');
                           }}
                           className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
@@ -759,7 +787,7 @@ export default function EmployeesPage() {
                                   {day.appointments.slice(0, 3).map((apt: any, index: number) => (
                                     <div key={index} className="flex items-center space-x-2">
                                       <span className="text-xs text-gray-400">
-                                        {new Date(apt.start_time).toLocaleTimeString('tr-TR', {
+                                        {new Date(apt.startTime || apt.start_time).toLocaleTimeString('tr-TR', {
                                           hour: '2-digit',
                                           minute: '2-digit'
                                         })}
