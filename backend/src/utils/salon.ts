@@ -25,7 +25,7 @@ export async function getUserSalonProfile(
 
   // If salonId is provided, find that specific salon
   if (salonId) {
-    const salon = user.salonProfiles.find((sp) => sp.id === salonId);
+    const salon = user.salonProfiles.find((sp: { id: string }) => sp.id === salonId);
     if (!salon) {
       throw new AppError('Salon profile not found or access denied', 404);
     }
