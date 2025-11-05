@@ -16,7 +16,7 @@
     "lint": "cd frontend && npm run lint",
     "lint:frontend": "cd frontend && npm run lint",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
-    "prepare": "husky install"
+    "prepare": "husky install || true"
   },
   "keywords": [
     "randevu",
