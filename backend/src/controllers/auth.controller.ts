@@ -174,7 +174,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           name: user.name,
           role: user.role,
         },
-        salonProfiles: user.salonProfiles.map(sp => ({
+        salonProfiles: user.salonProfiles.map((sp: { id: string; name: string }) => ({
           id: sp.id,
           name: sp.name,
         })),
