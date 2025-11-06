@@ -50,13 +50,13 @@ import appointmentRoutes from './routes/appointments.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import salonRoutes from './routes/salons.routes';
 
-app.use('/api/auth', authRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/services', serviceRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/salons', salonRoutes);
+app.use('/auth', authRoutes);
+app.use('/customers', customerRoutes);
+app.use('/employees', employeeRoutes);
+app.use('/services', serviceRoutes);
+app.use('/appointments', appointmentRoutes);
+app.use('/dashboard', dashboardRoutes);
+app.use('/salons', salonRoutes);
 
 // 404 handler
 app.use((req, res) => {

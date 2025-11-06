@@ -127,7 +127,7 @@ export const authApi = {
         currentSalonId: string | null;
         token: string;
       };
-    }>('/api/auth/register', {
+    }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
       requireAuth: false,
@@ -155,7 +155,7 @@ export const authApi = {
         currentSalonId: string | null;
         token: string;
       };
-    }>('/api/auth/login', {
+    }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
       requireAuth: false,
@@ -183,7 +183,7 @@ export const authApi = {
           email: string;
         }>;
       };
-    }>('/api/auth/me', {
+    }>('/auth/me', {
       method: 'GET',
     });
     return response.data;
@@ -196,7 +196,7 @@ export const salonsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any[];
-    }>('/api/salons', {
+    }>('/salons', {
       method: 'GET',
     });
     return response.data;
@@ -206,7 +206,7 @@ export const salonsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(`/api/salons/${id}`, {
+    }>(`/salons/${id}`, {
       method: 'GET',
     });
     return response.data;
@@ -225,7 +225,7 @@ export const salonsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>('/api/salons', {
+    }>('/salons', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -245,7 +245,7 @@ export const salonsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(`/api/salons/${id}`, {
+    }>(`/salons/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -256,7 +256,7 @@ export const salonsApi = {
     const response = await apiRequest<{
       success: boolean;
       message: string;
-    }>(`/api/salons/${id}`, {
+    }>(`/salons/${id}`, {
       method: 'DELETE',
     });
     return response;
@@ -269,7 +269,7 @@ export const customersApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any[];
-    }>(addSalonIdToEndpoint('/api/customers'), {
+    }>(addSalonIdToEndpoint('/customers'), {
       method: 'GET',
     });
     return response.data;
@@ -279,7 +279,7 @@ export const customersApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/customers/${id}`), {
+    }>(addSalonIdToEndpoint(`/customers/${id}`), {
       method: 'GET',
     });
     return response.data;
@@ -289,7 +289,7 @@ export const customersApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint('/api/customers'), {
+    }>(addSalonIdToEndpoint('/customers'), {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -300,7 +300,7 @@ export const customersApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/customers/${id}`), {
+    }>(addSalonIdToEndpoint(`/customers/${id}`), {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -310,7 +310,7 @@ export const customersApi = {
   delete: async (id: string) => {
     const response = await apiRequest<{
       success: boolean;
-    }>(addSalonIdToEndpoint(`/api/customers/${id}`), {
+    }>(addSalonIdToEndpoint(`/customers/${id}`), {
       method: 'DELETE',
     });
     return response;
@@ -323,7 +323,7 @@ export const employeesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any[];
-    }>(addSalonIdToEndpoint('/api/employees'), {
+    }>(addSalonIdToEndpoint('/employees'), {
       method: 'GET',
     });
     return response.data;
@@ -333,7 +333,7 @@ export const employeesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/employees/${id}`), {
+    }>(addSalonIdToEndpoint(`/employees/${id}`), {
       method: 'GET',
     });
     return response.data;
@@ -343,7 +343,7 @@ export const employeesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint('/api/employees'), {
+    }>(addSalonIdToEndpoint('/employees'), {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -354,7 +354,7 @@ export const employeesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/employees/${id}`), {
+    }>(addSalonIdToEndpoint(`/employees/${id}`), {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -364,7 +364,7 @@ export const employeesApi = {
   delete: async (id: string) => {
     const response = await apiRequest<{
       success: boolean;
-    }>(addSalonIdToEndpoint(`/api/employees/${id}`), {
+    }>(addSalonIdToEndpoint(`/employees/${id}`), {
       method: 'DELETE',
     });
     return response;
@@ -377,7 +377,7 @@ export const servicesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any[];
-    }>(addSalonIdToEndpoint('/api/services'), {
+    }>(addSalonIdToEndpoint('/services'), {
       method: 'GET',
     });
     return response.data;
@@ -387,7 +387,7 @@ export const servicesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/services/${id}`), {
+    }>(addSalonIdToEndpoint(`/services/${id}`), {
       method: 'GET',
     });
     return response.data;
@@ -397,7 +397,7 @@ export const servicesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint('/api/services'), {
+    }>(addSalonIdToEndpoint('/services'), {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -408,7 +408,7 @@ export const servicesApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/services/${id}`), {
+    }>(addSalonIdToEndpoint(`/services/${id}`), {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -418,7 +418,7 @@ export const servicesApi = {
   delete: async (id: string) => {
     const response = await apiRequest<{
       success: boolean;
-    }>(addSalonIdToEndpoint(`/api/services/${id}`), {
+    }>(addSalonIdToEndpoint(`/services/${id}`), {
       method: 'DELETE',
     });
     return response;
@@ -431,7 +431,7 @@ export const appointmentsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any[];
-    }>(addSalonIdToEndpoint('/api/appointments'), {
+    }>(addSalonIdToEndpoint('/appointments'), {
       method: 'GET',
     });
     return response.data;
@@ -441,7 +441,7 @@ export const appointmentsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/appointments/${id}`), {
+    }>(addSalonIdToEndpoint(`/appointments/${id}`), {
       method: 'GET',
     });
     return response.data;
@@ -451,7 +451,7 @@ export const appointmentsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint('/api/appointments'), {
+    }>(addSalonIdToEndpoint('/appointments'), {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -462,7 +462,7 @@ export const appointmentsApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint(`/api/appointments/${id}`), {
+    }>(addSalonIdToEndpoint(`/appointments/${id}`), {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -472,7 +472,7 @@ export const appointmentsApi = {
   delete: async (id: string) => {
     const response = await apiRequest<{
       success: boolean;
-    }>(addSalonIdToEndpoint(`/api/appointments/${id}`), {
+    }>(addSalonIdToEndpoint(`/appointments/${id}`), {
       method: 'DELETE',
     });
     return response;
@@ -485,7 +485,7 @@ export const dashboardApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any;
-    }>(addSalonIdToEndpoint('/api/dashboard/stats'), {
+    }>(addSalonIdToEndpoint('/dashboard/stats'), {
       method: 'GET',
     });
     return response.data;
@@ -495,7 +495,7 @@ export const dashboardApi = {
     const response = await apiRequest<{
       success: boolean;
       data: any[];
-    }>(addSalonIdToEndpoint('/api/dashboard/activities'), {
+    }>(addSalonIdToEndpoint('/dashboard/activities'), {
       method: 'GET',
     });
     return response.data;
