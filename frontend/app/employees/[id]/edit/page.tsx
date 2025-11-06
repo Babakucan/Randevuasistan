@@ -121,16 +121,11 @@ export default function EmployeeEditPage() {
       ? employeeServices.filter(id => id !== serviceId)
       : [...employeeServices, serviceId]
     
+    // Optimistic update
+    setEmployeeServices(newServices)
+    
     try {
-      // Not: Backend'te employee service ilişkisi EmployeeService tablosu üzerinden yönetiliyor
-      // Şimdilik bu işlevi backend'e eklemek yerine, sadece UI'da güncelliyoruz
-      // Gerçek implementasyon için backend'e özel endpoint eklenebilir
-      setEmployeeServices(newServices)
-      
-      // TODO: Backend'e employee service assignment endpoint'i eklenmeli
-      // await employeesApi.assignService(employee.id, serviceId, !isCurrentlyAssigned)
-      
-      alert(isCurrentlyAssigned ? 'Hizmet kaldırıldı' : 'Hizmet eklendi')
+      await employeesApi.assignService(employee.id, serviceId, !isCurrentlyAssigned)
     } catch (error) {
       console.error('Error toggling service:', error)
       alert('Hizmet güncellenirken hata oluştu')
@@ -168,16 +163,14 @@ export default function EmployeeEditPage() {
           : undefined
       })
 
-      // Başarılı olduğunda state'i hemen false yap (buton tekrar aktif olur)
-      setSaving(false)
-      
-      // Yönlendirmeyi hemen yap
+      // Başarılı olduğunda yönlendir
       router.push(`/employees/${employee.id}`)
     } catch (error: any) {
       console.error('Error updating employee:', error)
       const errorMessage = error?.message || 'Güncelleme sırasında hata oluştu!'
       alert(errorMessage)
-      // Hata durumunda state'i false yap
+    } finally {
+      // Her durumda state'i false yap
       setSaving(false)
     }
   }

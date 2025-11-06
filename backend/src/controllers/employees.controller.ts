@@ -276,3 +276,93 @@ export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
+export const assignServiceToEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { id: employeeId } = req.params;
+    const { serviceId, assign } = req.body;
+    const salonId = req.query.salonId as string | undefined;
+
+    if (!serviceId || typeof assign !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        message: 'serviceId and assign (boolean) are required',
+      });
+      return;
+    }
+
+    const { salonId: activeSalonId } = await getUserSalonProfile(userId, salonId);
+
+    // Verify employee belongs to salon
+    const employee = await prisma.employee.findFirst({
+      where: {
+        id: employeeId,
+        salonId: activeSalonId,
+      },
+    });
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    // Verify service belongs to salon
+    const service = await prisma.service.findFirst({
+      where: {
+        id: serviceId,
+        salonId: activeSalonId,
+      },
+    });
+
+    if (!service) {
+      throw new AppError('Service not found', 404);
+    }
+
+    if (assign) {
+      // Assign service to employee (upsert to handle duplicates)
+      await prisma.employeeService.upsert({
+        where: {
+          employeeId_serviceId: {
+            employeeId,
+            serviceId,
+          },
+        },
+        update: {
+          isAvailable: true,
+        },
+        create: {
+          employeeId,
+          serviceId,
+          isAvailable: true,
+        },
+      });
+    } else {
+      // Remove service assignment
+      await prisma.employeeService.deleteMany({
+        where: {
+          employeeId,
+          serviceId,
+        },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: assign ? 'Service assigned to employee successfully' : 'Service removed from employee successfully',
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    console.error('Assign service to employee error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to assign service to employee',
+    });
+  }
+};
+

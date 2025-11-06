@@ -5,6 +5,7 @@ import {
   createEmployee,
   updateEmployee,
   deleteEmployee,
+  assignServiceToEmployee,
 } from '../controllers/employees.controller';
 import { authenticate } from '../middleware/auth';
 
@@ -17,6 +18,7 @@ router.get('/:id', getEmployeeById);
 router.post('/', createEmployee);
 router.put('/:id', updateEmployee);
 router.delete('/:id', deleteEmployee);
+router.post('/:id/services', assignServiceToEmployee);
 
 export default router;
 

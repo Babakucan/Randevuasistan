@@ -510,7 +510,7 @@ sudo tail -f /var/log/nginx/error.log
 
 ---
 
-**Son Güncelleme:** V2.0.0  
-**Deployment Versiyonu:** 2.0  
-**Dokümantasyon Tarihi:** 2024
+**Son Güncelleme:** V2.1.0  
+**Deployment Versiyonu:** 2.1  
+**Dokümantasyon Tarihi:** 2025-11-06
 

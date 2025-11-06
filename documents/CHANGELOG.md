@@ -5,20 +5,20 @@ Tüm önemli değişiklikler bu dosyada dokümante edilmiştir.
 Format [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/) standardına göre,
 ve bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 
-## [2.1.0] - 2025 - Temizlik ve Optimizasyon
+## [2.1.0] - 2025-11-06 - Temizlik ve Optimizasyon
 
 ### 🧹 Temizlik
-- ✅ **36 SQL dosyası kaldırıldı** (V1'den kalan Supabase schema dosyaları)
-- ✅ **Eski Supabase dokümantasyon dosyaları kaldırıldı** (3 dosya)
-- ✅ **Backup dosyaları kaldırıldı** (page.tsx.backup)
-- ✅ **Geçici dosyalar temizlendi** (deneme.txt)
-- ✅ **Toplam 41 gereksiz dosya git'ten kaldırıldı**
+- ✅ **Gereksiz dosyalar temizlendi**: SQL dosyaları, backup dosyaları ve eski Supabase referansları `.gitignore` ile yönetiliyor
+- ✅ **Kod temizliği**: Eski Supabase referansları kod dosyalarından kaldırıldı (sadece dokümantasyonda referanslar kaldı)
 
 ### 🐛 Düzeltmeler
-- ⚠️ Çalışan düzenleme sayfası buton state yönetimi (bekliyor)
-- ⚠️ Employee Service assignment endpoint implementasyonu (bekliyor)
-- ⚠️ Phone Calls sayfası migration (bekliyor)
-- ⚠️ WhatsApp sayfası migration (bekliyor)
+- ✅ **Çalışan düzenleme sayfası buton state yönetimi**: `handleSave` fonksiyonunda `finally` bloğu eklendi, buton state her durumda doğru şekilde yönetiliyor
+- ✅ **Employee Service assignment endpoint**: Backend'e `POST /api/employees/:id/services` endpoint'i eklendi
+  - `assignServiceToEmployee` controller fonksiyonu eklendi
+  - Frontend'de `employeesApi.assignService` metodu eklendi
+  - Employee edit sayfasında gerçek API entegrasyonu yapıldı
+- ✅ **Phone Calls sayfası migration**: Zaten `authApi` kullanıyor, migration tamamlanmış
+- ✅ **WhatsApp sayfası migration**: Zaten `authApi` kullanıyor, migration tamamlanmış
 
 ### 📝 Dokümantasyon
 - ✅ ARCHITECTURE.md eklendi
@@ -107,11 +107,11 @@ ve bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 
 ### 🐛 Bilinen Sorunlar
 
-#### Kalan Sorunlar
-- ⚠️ **Çalışan Düzenleme Butonu**: Kayıt sonrası buton state yönetimi (düzeltilecek V2.1'de)
-- ⚠️ **Employee Service Assignment**: Backend endpoint'i henüz yok (UI'da placeholder)
-- ⚠️ **Phone Calls Sayfası**: Eski Supabase referansları var
-- ⚠️ **WhatsApp Sayfası**: Eski Supabase referansları var
+#### Çözülen Sorunlar
+- ✅ **Çalışan Düzenleme Butonu**: Buton state yönetimi düzeltildi (V2.1.0)
+- ✅ **Employee Service Assignment**: Backend endpoint'i eklendi ve frontend'de entegre edildi (V2.1.0)
+- ✅ **Phone Calls Sayfası**: Migration tamamlandı (V2.0.0)
+- ✅ **WhatsApp Sayfası**: Migration tamamlandı (V2.0.0)
 
 ### 📊 İstatistikler
 
@@ -151,6 +151,6 @@ ve bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 
 **Not:** Bu changelog otomatik güncellenmez. Her versiyon için manuel olarak güncellenmelidir.
 
-**Son Güncelleme:** V2.0.0  
-**Sonraki Versiyon:** V2.1.0
+**Son Güncelleme:** V2.1.0  
+**Sonraki Versiyon:** V2.2.0
 

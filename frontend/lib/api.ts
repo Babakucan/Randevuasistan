@@ -369,6 +369,17 @@ export const employeesApi = {
     });
     return response;
   },
+
+  assignService: async (employeeId: string, serviceId: string, assign: boolean) => {
+    const response = await apiRequest<{
+      success: boolean;
+      message: string;
+    }>(addSalonIdToEndpoint(`/employees/${employeeId}/services`), {
+      method: 'POST',
+      body: JSON.stringify({ serviceId, assign }),
+    });
+    return response;
+  },
 };
 
 // Services API
