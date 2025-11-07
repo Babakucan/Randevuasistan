@@ -172,6 +172,10 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
   try {
     const userId = req.user!.id;
     const { id } = req.params;
+    console.log('Incoming employee update request:', {
+      paramsId: id,
+      body: req.body
+    });
     const body = updateEmployeeSchema.parse(req.body);
     const salonId = req.query.salonId as string | undefined;
 

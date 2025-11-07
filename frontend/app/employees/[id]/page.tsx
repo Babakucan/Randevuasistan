@@ -15,6 +15,35 @@ export default function EmployeeDetailPage() {
   const [employee, setEmployee] = useState<any>(null)
   const [updatingLeaveDay, setUpdatingLeaveDay] = useState<string | null>(null)
   const [updatingTime, setUpdatingTime] = useState<string | null>(null)
+  const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([])
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [notes, setNotes] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+
+  const normalizeNumber = (value: unknown): number | undefined => {
+    if (value === undefined || value === null || value === '') {
+      return undefined
+    }
+
+    const numericValue = Number(value)
+    return Number.isNaN(numericValue) ? undefined : numericValue
+  }
+
+  const loadTeamMembers = async () => {
+    try {
+      const employeesList = await employeesApi.getAll()
+      if (employeesList && Array.isArray(employeesList)) {
+        const filtered = employeesList
+          .filter((emp: any) => emp.id !== employeeId)
+          .sort((a: any, b: any) => a.name.localeCompare(b.name))
+          .slice(0, 6)
+        setTeamMembers(filtered)
+      }
+    } catch (error) {
+      console.error('Error loading team members:', error)
+      setTeamMembers([])
+    }
+  }
 
   useEffect(() => {
     checkUser()
@@ -24,6 +53,7 @@ export default function EmployeeDetailPage() {
     if (user && employeeId) {
       console.log('useEffect triggered:', { user: user?.id, employeeId })
       loadEmployee()
+      loadTeamMembers()
     }
   }, [user, employeeId])
 
@@ -75,7 +105,8 @@ export default function EmployeeDetailPage() {
           workingHours: employeeData.workingHours || employeeData.working_hours || {},
           leaveDays: employeeData.leaveDays || employeeData.leave_days || [],
           experienceYears: employeeData.experienceYears || employeeData.experience_years,
-          hourlyRate: employeeData.hourlyRate || employeeData.hourly_rate
+          hourlyRate: employeeData.hourlyRate || employeeData.hourly_rate,
+          appointments: employeeData.appointments || []
         };
         
         // İzin günleri yoksa boş array oluştur
@@ -84,6 +115,23 @@ export default function EmployeeDetailPage() {
         }
         
         setEmployee(normalizedEmployee);
+        setNotes(normalizedEmployee.bio || '');
+
+        const now = new Date();
+        const upcoming = (normalizedEmployee.appointments || [])
+          .map((appointment: any) => ({
+            ...appointment,
+            startTime: appointment.startTime || appointment.start_time,
+            endTime: appointment.endTime || appointment.end_time,
+          }))
+          .filter((appointment: any) => {
+            if (!appointment.startTime) return false
+            return new Date(appointment.startTime) >= now
+          })
+          .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+          .slice(0, 5)
+
+        setUpcomingAppointments(upcoming)
       }
     } catch (error) {
       console.error('Error loading employee:', error);
@@ -117,6 +165,60 @@ export default function EmployeeDetailPage() {
       sunday: 7
     }
     return order[day] || 0
+  }
+
+  const getShortDayLabel = (date: Date) => {
+    const labels = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
+    return labels[date.getDay()] || ''
+  }
+
+  const formatAppointmentDate = (isoDate: string) => {
+    const date = new Date(isoDate)
+    return date.toLocaleDateString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
+  }
+
+  const formatAppointmentTimeRange = (start?: string, end?: string) => {
+    if (!start || !end) return 'Saat bilgisi yok'
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return 'Saat bilgisi yok'
+    }
+    return `${startDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
+  }
+
+  const generateSchedulePreview = (daysCount = 14) => {
+    if (!employee) return []
+
+    const workingHours = employee.workingHours || employee.working_hours || {}
+    const leaveDays = (Array.isArray(employee.leaveDays) ? employee.leaveDays : (Array.isArray(employee.leave_days) ? employee.leave_days : [])).map((d: string) => d.toLowerCase())
+
+    const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return Array.from({ length: daysCount }, (_, index) => {
+      const date = new Date(today)
+      date.setDate(today.getDate() + index)
+      const dayKey = dayKeys[date.getDay()]
+      const dayConfig = workingHours[dayKey] || { available: false, start: '09:00', end: '18:00' }
+      const isLeave = leaveDays.includes(dayKey)
+      const isWorking = dayConfig.available && !isLeave
+
+      return {
+        date,
+        dayKey,
+        isLeave,
+        isWorking,
+        start: dayConfig.start,
+        end: dayConfig.end
+      }
+    })
   }
 
   const getNextOccurrence = (dayName: string) => {
@@ -217,8 +319,8 @@ export default function EmployeeDetailPage() {
         workingHours: updatedWorkingHours,
         leaveDays: currentLeaveDays,
         bio: employee.bio || undefined,
-        experienceYears: employee.experienceYears || employee.experience_years || undefined,
-        hourlyRate: employee.hourlyRate || employee.hourly_rate || undefined
+        experienceYears: normalizeNumber(employee.experienceYears ?? employee.experience_years),
+        hourlyRate: normalizeNumber(employee.hourlyRate ?? employee.hourly_rate)
       })
 
       console.log('Update result:', result)
@@ -291,6 +393,10 @@ export default function EmployeeDetailPage() {
     setEmployee(updatedEmployee)
 
     try {
+      console.log('Updating employee payload:', {
+        workingHours: updatedWorkingHours,
+        leaveDays: updatedLeaveDays
+      })
       await employeesApi.update(employee.id, {
         name: employee.name,
         email: employee.email || undefined,
@@ -300,8 +406,8 @@ export default function EmployeeDetailPage() {
         workingHours: updatedWorkingHours,
         leaveDays: updatedLeaveDays,
         bio: employee.bio || undefined,
-        experienceYears: employee.experienceYears || employee.experience_years || undefined,
-        hourlyRate: employee.hourlyRate || employee.hourly_rate || undefined
+        experienceYears: normalizeNumber(employee.experienceYears ?? employee.experience_years),
+        hourlyRate: normalizeNumber(employee.hourlyRate ?? employee.hourly_rate)
       })
       await loadEmployee()
     } catch (error: any) {
@@ -316,6 +422,23 @@ export default function EmployeeDetailPage() {
       await loadEmployee()
     } finally {
       setUpdatingLeaveDay(null)
+    }
+  }
+
+  const handleNotesSave = async () => {
+    if (!user || !employee) return
+    setSavingNotes(true)
+
+    try {
+      await employeesApi.update(employee.id, {
+        bio: notes || null
+      })
+      await loadEmployee()
+    } catch (error: any) {
+      const message = error?.message || 'Notlar kaydedilirken bir hata oluştu.'
+      alert(message)
+    } finally {
+      setSavingNotes(false)
     }
   }
 
@@ -342,6 +465,8 @@ export default function EmployeeDetailPage() {
       </div>
     )
   }
+
+  const schedulePreview = generateSchedulePreview()
 
      return (
      <div className="min-h-screen bg-gray-50 p-6">
@@ -430,12 +555,6 @@ export default function EmployeeDetailPage() {
                 </div>
               </div>
 
-              {employee.bio && (
-                <div className="mt-6">
-                  <p className="text-sm text-gray-600 mb-2">Hakkında</p>
-                  <p className="text-gray-900">{employee.bio}</p>
-                </div>
-              )}
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -594,26 +713,115 @@ export default function EmployeeDetailPage() {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Calendar size={20} />
+                Yaklaşan Randevular
+              </h2>
+              {upcomingAppointments.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingAppointments.map((appointment: any) => (
+                    <div
+                      key={appointment.id}
+                      className="border border-gray-200 rounded-xl p-4 hover:border-blue-200 hover:bg-blue-50/40 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {appointment.customer?.name || 'Müşteri bilgisi yok'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {appointment.service?.name || 'Hizmet bilgisi yok'}
+                          </p>
+                          <span className={`mt-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${appointment.status === 'confirmed' ? 'bg-green-100 text-green-700' : appointment.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-700'}`}>
+                            {appointment.status || 'beklemede'}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-blue-600">
+                            {formatAppointmentDate(appointment.startTime)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatAppointmentTimeRange(appointment.startTime, appointment.endTime)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl">
+                  <p className="text-gray-600 font-medium">Önümüzdeki 30 günde planlanmış randevu bulunmuyor.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold mb-4">Önümüzdeki 14 Gün</h2>
+              <div className="grid grid-cols-7 gap-2">
+                {schedulePreview.map((dayInfo, index) => (
+                  <div
+                    key={index}
+                    className={`rounded-xl p-3 text-center border transition-all ${
+                      dayInfo.isWorking
+                        ? 'border-green-200 bg-green-50 text-green-700'
+                        : dayInfo.isLeave
+                          ? 'border-red-200 bg-red-50 text-red-600'
+                          : 'border-gray-200 bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    <p className="text-xs font-semibold mb-1">{getShortDayLabel(dayInfo.date)}</p>
+                    <p className="text-sm font-semibold">
+                      {dayInfo.date.getDate().toString().padStart(2, '0')}
+                    </p>
+                    <p className="text-[10px] mt-1">
+                      {dayInfo.isWorking
+                        ? `${dayInfo.start || '??'} - ${dayInfo.end || '??'}`
+                        : dayInfo.isLeave
+                          ? 'İzinli'
+                          : 'Kapalı'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold mb-4">İç Notlar</h2>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={5}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                placeholder="Takım içi notları buraya kaydedin..."
+              />
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={handleNotesSave}
+                  disabled={savingNotes}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 text-sm"
+                >
+                  {savingNotes ? 'Kaydediliyor...' : 'Notları Kaydet'}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Calendar size={20} />
                 İzin Günleri
               </h2>
-              
-                             {(employee.leaveDays && employee.leaveDays.length > 0) ? (
-                 <div className="space-y-3">
-                   {employee.leaveDays.map((day: string, index: number) => (
-                     <div key={index} className="flex items-center justify-between p-4 bg-red-50 border-2 border-red-200 rounded-xl">
-                       <div className="flex items-center gap-3">
-                         <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                         <div>
-                           <p className="text-sm font-medium text-red-800">{getDayName(day)}</p>
-                           <p className="text-xs text-red-600">{getNextOccurrence(day)}</p>
-                         </div>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
+              {employee.leaveDays && employee.leaveDays.length > 0 ? (
+                <div className="space-y-3">
+                  {employee.leaveDays.map((day: string, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-xl">
+                      <div>
+                        <p className="text-sm font-semibold text-red-700">{getDayName(day)}</p>
+                        <p className="text-xs text-red-500">{getNextOccurrence(day)}</p>
+                      </div>
+                      <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full">İzinli</span>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="text-center py-12 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl">
-                  <Calendar size={40} className="mx-auto text-gray-400 mb-3" />
+                <div className="text-center py-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl">
                   <p className="text-gray-600 font-medium">Henüz izin günü belirtilmemiş</p>
                 </div>
               )}
@@ -630,6 +838,25 @@ export default function EmployeeDetailPage() {
                     >
                       {specialty}
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {teamMembers.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-lg font-semibold mb-4">Takım Arkadaşları</h2>
+                <div className="space-y-3">
+                  {teamMembers.map((member: any) => (
+                    <div key={member.id} className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{member.name}</p>
+                        <p className="text-xs text-gray-500">{member.position || 'Pozisyon belirtilmemiş'}</p>
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${member.isActive === false || member.is_active === false ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700'}`}>
+                        {member.isActive === false || member.is_active === false ? 'Pasif' : 'Aktif'}
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>

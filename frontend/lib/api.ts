@@ -402,6 +402,9 @@ export const employeesApi = {
   },
 
   update: async (id: string, data: any) => {
+    if (typeof window !== 'undefined') {
+      console.log('🛰️ employeesApi.update payload:', { id, data })
+    }
     const response = await apiRequest<{
       success: boolean;
       data: any;
