@@ -40,7 +40,6 @@ interface AdminShellProps {
 }
 
 const navItems = [
-  { href: '/salons', label: 'Salon Yönetimi', icon: Building },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/appointments', label: 'Randevular', icon: Calendar },
   { href: '/customers', label: 'Müşteriler', icon: Users },

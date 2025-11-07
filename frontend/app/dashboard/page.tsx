@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { capitalizeName } from '@/lib/utils';
-import { authApi, dashboardApi, customersApi, servicesApi, employeesApi, appointmentsApi, removeToken, getToken, getCurrentSalonId, setCurrentSalonId } from '@/lib/api';
+import { dashboardApi, customersApi, servicesApi, employeesApi, appointmentsApi } from '@/lib/api';
 import AdminShell from '@/components/layout/AdminShell';
+import useAdminSession from '@/hooks/useAdminSession';
 import {
   Calendar,
   Users,
@@ -40,7 +41,7 @@ interface ChartData {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, salons, currentSalonId, loading: sessionLoading, signOut, selectSalon } = useAdminSession();
   const [stats, setStats] = useState({
     totalAppointments: 0,
     totalCustomers: 0,
@@ -52,7 +53,7 @@ export default function DashboardPage() {
     thisMonthEarnings: 0
   });
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [showQuickAppointment, setShowQuickAppointment] = useState(false);
   const [showQuickCustomer, setShowQuickCustomer] = useState(false);
   const [showQuickEmployee, setShowQuickEmployee] = useState(false);
@@ -61,7 +62,6 @@ export default function DashboardPage() {
   const [todayUpcomingAppointments, setTodayUpcomingAppointments] = useState<any[]>([]);
   const [todayCompletedAppointments, setTodayCompletedAppointments] = useState<any[]>([]);
   const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
-  const [currentSalonId, setCurrentSalonIdState] = useState<string | null>(null);
 
   const appointmentStatusOptions = [
     { value: 'scheduled', label: 'Beklemede' },
@@ -167,11 +167,11 @@ export default function DashboardPage() {
   const loadDashboardData = async (userId: string) => {
     try {
       // Bu fonksiyon artık kullanılmıyor, checkUser içinde yapılıyor
-      setLoading(false);
+      setDataLoading(false);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   };
 
@@ -308,50 +308,27 @@ export default function DashboardPage() {
     ]);
   };
 
-  const checkUser = async () => {
-    try {
-      const token = getToken();
-      if (!token) {
-        router.push('/login');
-        setLoading(false);
-        return;
-      }
-
-      const currentUser = await authApi.getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
-
-        if (currentUser.salonProfiles && currentUser.salonProfiles.length > 0) {
-          let salonId = getCurrentSalonId();
-
-          if (!salonId || !currentUser.salonProfiles.some((sp) => sp.id === salonId)) {
-            salonId = currentUser.salonProfiles[0].id;
-          }
-
-          setCurrentSalonId(salonId);
-          setCurrentSalonIdState(salonId);
-
-          try {
-            await loadSalonScopedData(salonId);
-          } catch (error) {
-            console.error('Error loading dashboard data:', error);
-          }
-        } else {
-          console.error('No salon profiles found for user');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking user:', error);
-      removeToken();
-      router.push('/login');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    checkUser();
-  }, []);
+    if (sessionLoading) return
+
+    if (!currentSalonId) {
+      setDataLoading(false)
+      return
+    }
+
+    const hydrate = async () => {
+      try {
+        setDataLoading(true)
+        await loadSalonScopedData(currentSalonId)
+      } catch (error) {
+        console.error('Error loading dashboard data:', error)
+      } finally {
+        setDataLoading(false)
+      }
+    }
+
+    hydrate()
+  }, [sessionLoading, currentSalonId])
 
   const loadCustomerEarnings = async (salonId: string) => {
     try {
@@ -362,33 +339,23 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      removeToken();
-      router.push('/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
   const handleSalonChange = async (salonId: string) => {
     if (!salonId || salonId === currentSalonId) {
       return;
     }
 
-    if (!user?.salonProfiles?.some((sp) => sp.id === salonId)) {
+    if (!salons.some((salon) => salon.id === salonId)) {
       return;
     }
 
     try {
-      setLoading(true);
-      setCurrentSalonIdState(salonId);
-      setCurrentSalonId(salonId);
+      setDataLoading(true);
+      selectSalon(salonId);
       await loadSalonScopedData(salonId);
     } catch (error) {
       console.error('Error switching salon:', error);
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   };
 
@@ -488,26 +455,21 @@ export default function DashboardPage() {
       alert('Hizmet eklenirken hata oluştu!');
     }
   };
-  const salonOptions = (user?.salonProfiles ?? []).map((salon: any) => ({
-    id: salon.id,
-    name: salon.name,
-  }));
+  const salonOptions = salons
 
   const activeSalonName =
-    salonOptions.find((salon) => salon.id === currentSalonId)?.name ||
-    salonOptions[0]?.name ||
-    'Salon';
+    salons.find((salon) => salon.id === currentSalonId)?.name || salons[0]?.name || 'Salon'
 
-  if (loading) {
+  if (sessionLoading || dataLoading) {
     return (
       <>
         <AdminShell
           title="Dashboard"
           user={user}
-          salons={salonOptions}
+          salons={salons}
           currentSalonId={currentSalonId}
+          onSignOut={signOut}
           onSalonChange={handleSalonChange}
-          onSignOut={handleSignOut}
         >
           <div className="flex h-60 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/60">
             <div className="flex items-center gap-3 text-slate-300">
@@ -526,8 +488,8 @@ export default function DashboardPage() {
         user={user}
         salons={salonOptions}
         currentSalonId={currentSalonId}
+        onSignOut={signOut}
         onSalonChange={handleSalonChange}
-        onSignOut={handleSignOut}
       >
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
           <button
