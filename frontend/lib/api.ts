@@ -1,6 +1,14 @@
 // API Client for Backend Integration
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// HARDCODE API URL to ensure it works - can be changed later via env
+const API_BASE_URL = 'http://localhost:3001';
+
+// Debug: Log API URL in development
+if (typeof window !== 'undefined') {
+  console.log('🔗 API Base URL (hardcoded):', API_BASE_URL);
+  console.log('🔗 NEXT_PUBLIC_API_URL env:', process.env.NEXT_PUBLIC_API_URL);
+  console.log('🔗 Window location:', window.location.origin);
+}
 
 // Token management
 export const getToken = (): string | null => {
@@ -59,9 +67,9 @@ async function apiRequest<T>(
 ): Promise<T> {
   const { requireAuth = true, ...fetchOptions } = options;
   
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...fetchOptions.headers,
+    ...(fetchOptions.headers as Record<string, string> || {}),
   };
 
   // Add auth token if required
@@ -74,31 +82,74 @@ async function apiRequest<T>(
 
   const url = `${API_BASE_URL}${endpoint}`;
   
+  // Debug logging - always log in development
+  if (typeof window !== 'undefined') {
+    console.log('🌐 API Request:', {
+      method: fetchOptions.method || 'GET',
+      url,
+      endpoint,
+      apiBaseUrl: API_BASE_URL,
+      headers: Object.keys(headers),
+      hasAuth: !!headers['Authorization'],
+    });
+  }
+  
   try {
-    const response = await fetch(url, {
+    const fetchPromise = fetch(url, {
       ...fetchOptions,
       headers,
     });
+    
+    // Add timeout for fetch
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000)
+    );
+    
+    const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+    // Check if response is ok before trying to parse JSON
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        // Validation error'ları daha detaylı göster
+        if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+          const errorMessages = errorData.errors.map((err: any) => {
+            const path = err.path?.join('.') || err.path?.[0] || 'field';
+            return `${path}: ${err.message}`;
+          }).join(', ');
+          throw new Error(`Validation error: ${errorMessages}`);
+        }
+        errorMessage = errorData.message || errorMessage;
+      } catch (parseError) {
+        // If JSON parsing fails, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
 
     const data = await response.json();
-
-    if (!response.ok) {
-      // Validation error'ları daha detaylı göster
-      if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-        const errorMessages = data.errors.map((err: any) => 
-          `${err.path?.join('.') || 'field'}: ${err.message}`
-        ).join(', ');
-        throw new Error(`Validation error: ${errorMessages}`);
-      }
-      throw new Error(data.message || 'API request failed');
-    }
-
     return data;
   } catch (error) {
+    // Handle network errors (failed to fetch)
+    if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+      console.error('❌ API Request Error:', {
+        url,
+        error: error.message,
+        apiBaseUrl: API_BASE_URL,
+        errorType: error.constructor.name,
+        fullError: error,
+      });
+      
+      // More detailed error message
+      const errorMsg = `Backend sunucusuna bağlanılamıyor (${API_BASE_URL}). Lütfen backend'in çalıştığından emin olun.`;
+      throw new Error(errorMsg);
+    }
     if (error instanceof Error) {
+      console.error('❌ API Error:', error.message);
       throw error;
     }
-    throw new Error('Unknown error occurred');
+    throw new Error('Bilinmeyen bir hata oluştu');
   }
 }
 
@@ -365,6 +416,26 @@ export const employeesApi = {
     const response = await apiRequest<{
       success: boolean;
     }>(addSalonIdToEndpoint(`/api/employees/${id}`), {
+      method: 'DELETE',
+    });
+    return response;
+  },
+
+  assignService: async (id: string, serviceId: string, isAvailable: boolean = true) => {
+    const response = await apiRequest<{
+      success: boolean;
+      data: any;
+    }>(addSalonIdToEndpoint(`/api/employees/${id}/services`), {
+      method: 'POST',
+      body: JSON.stringify({ serviceId, isAvailable }),
+    });
+    return response.data;
+  },
+
+  removeService: async (id: string, serviceId: string) => {
+    const response = await apiRequest<{
+      success: boolean;
+    }>(addSalonIdToEndpoint(`/api/employees/${id}/services/${serviceId}`), {
       method: 'DELETE',
     });
     return response;

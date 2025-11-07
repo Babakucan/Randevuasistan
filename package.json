@@ -4,7 +4,8 @@
   "description": "Kuaförlere özel yapay zeka destekli randevu yönetim sistemi",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "clean:ports": "node scripts/clean-ports.js",
+    "dev": "npm run clean:ports && concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "build": "npm run build:frontend && npm run build:backend",

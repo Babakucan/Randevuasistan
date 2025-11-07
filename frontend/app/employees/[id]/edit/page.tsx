@@ -117,23 +117,24 @@ export default function EmployeeEditPage() {
     setUpdatingService(serviceId)
     
     const isCurrentlyAssigned = employeeServices.includes(serviceId)
-    const newServices = isCurrentlyAssigned
-      ? employeeServices.filter(id => id !== serviceId)
-      : [...employeeServices, serviceId]
     
     try {
-      // Not: Backend'te employee service ilişkisi EmployeeService tablosu üzerinden yönetiliyor
-      // Şimdilik bu işlevi backend'e eklemek yerine, sadece UI'da güncelliyoruz
-      // Gerçek implementasyon için backend'e özel endpoint eklenebilir
-      setEmployeeServices(newServices)
+      if (isCurrentlyAssigned) {
+        // Hizmeti kaldır
+        await employeesApi.removeService(employee.id, serviceId)
+        setEmployeeServices(prev => prev.filter(id => id !== serviceId))
+      } else {
+        // Hizmeti ekle
+        await employeesApi.assignService(employee.id, serviceId, true)
+        setEmployeeServices(prev => [...prev, serviceId])
+      }
       
-      // TODO: Backend'e employee service assignment endpoint'i eklenmeli
-      // await employeesApi.assignService(employee.id, serviceId, !isCurrentlyAssigned)
-      
-      alert(isCurrentlyAssigned ? 'Hizmet kaldırıldı' : 'Hizmet eklendi')
-    } catch (error) {
+      // Başarılı olduğunda hizmetleri yeniden yükle
+      await loadEmployeeServices(employee.id)
+    } catch (error: any) {
       console.error('Error toggling service:', error)
-      alert('Hizmet güncellenirken hata oluştu')
+      const errorMessage = error?.message || 'Hizmet güncellenirken hata oluştu'
+      alert(errorMessage)
       // Hata durumunda geri al
       await loadEmployeeServices(employee.id)
     } finally {

@@ -7,15 +7,15 @@ import { getUserSalonProfile } from '../utils/salon';
 
 const createEmployeeSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  position: z.string().optional(),
+  email: z.union([z.string().email(), z.string().length(0), z.null()]).optional(),
+  phone: z.union([z.string(), z.string().length(0), z.null()]).optional(),
+  position: z.union([z.string(), z.string().length(0), z.null()]).optional(),
   specialties: z.array(z.string()).optional(),
   workingHours: z.record(z.any()).optional(),
   leaveDays: z.array(z.string()).optional(),
-  bio: z.string().optional(),
-  experienceYears: z.number().optional(),
-  hourlyRate: z.number().optional(),
+  bio: z.union([z.string(), z.string().length(0), z.null()]).optional(),
+  experienceYears: z.union([z.number(), z.null()]).optional(),
+  hourlyRate: z.union([z.number(), z.null()]).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -177,24 +177,27 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
 
     const { salonId: activeSalonId } = await getUserSalonProfile(userId, salonId);
 
+    // Prepare update data, handling null/undefined values properly
+    const updateData: any = {};
+    
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.email !== undefined) updateData.email = body.email || null;
+    if (body.phone !== undefined) updateData.phone = body.phone || null;
+    if (body.position !== undefined) updateData.position = body.position || null;
+    if (body.specialties !== undefined) updateData.specialties = body.specialties || [];
+    if (body.workingHours !== undefined) updateData.workingHours = body.workingHours || {};
+    if (body.leaveDays !== undefined) updateData.leaveDays = body.leaveDays || [];
+    if (body.bio !== undefined) updateData.bio = body.bio || null;
+    if (body.experienceYears !== undefined) updateData.experienceYears = body.experienceYears ?? null;
+    if (body.hourlyRate !== undefined) updateData.hourlyRate = body.hourlyRate ?? null;
+    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+
     const employee = await prisma.employee.updateMany({
       where: {
         id,
         salonId: activeSalonId,
       },
-      data: {
-        ...(body.name && { name: body.name }),
-        ...(body.email !== undefined && { email: body.email }),
-        ...(body.phone !== undefined && { phone: body.phone }),
-        ...(body.position !== undefined && { position: body.position }),
-        ...(body.specialties !== undefined && { specialties: body.specialties }),
-        ...(body.workingHours !== undefined && { workingHours: body.workingHours }),
-        ...(body.leaveDays !== undefined && { leaveDays: body.leaveDays }),
-        ...(body.bio !== undefined && { bio: body.bio }),
-        ...(body.experienceYears !== undefined && { experienceYears: body.experienceYears }),
-        ...(body.hourlyRate !== undefined && { hourlyRate: body.hourlyRate }),
-        ...(body.isActive !== undefined && { isActive: body.isActive }),
-      },
+      data: updateData,
     });
 
     if (employee.count === 0) {
@@ -272,6 +275,137 @@ export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<v
     res.status(500).json({
       success: false,
       message: 'Failed to delete employee',
+    });
+  }
+};
+
+// Employee Service Assignment
+export const assignServiceToEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { id: employeeId } = req.params;
+    const { serviceId, isAvailable = true } = req.body;
+    const salonId = req.query.salonId as string | undefined;
+
+    if (!serviceId) {
+      throw new AppError('Service ID is required', 400);
+    }
+
+    const { salonId: activeSalonId } = await getUserSalonProfile(userId, salonId);
+
+    // Check if employee exists and belongs to salon
+    const employee = await prisma.employee.findFirst({
+      where: {
+        id: employeeId,
+        salonId: activeSalonId,
+      },
+    });
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    // Check if service exists and belongs to salon
+    const service = await prisma.service.findFirst({
+      where: {
+        id: serviceId,
+        salonId: activeSalonId,
+      },
+    });
+
+    if (!service) {
+      throw new AppError('Service not found', 404);
+    }
+
+    // Create or update employee service relationship
+    const employeeService = await prisma.employeeService.upsert({
+      where: {
+        employeeId_serviceId: {
+          employeeId,
+          serviceId,
+        },
+      },
+      update: {
+        isAvailable,
+      },
+      create: {
+        employeeId,
+        serviceId,
+        isAvailable,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Service assigned to employee successfully',
+      data: employeeService,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    console.error('Assign service to employee error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to assign service to employee',
+    });
+  }
+};
+
+export const removeServiceFromEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { id: employeeId, serviceId } = req.params;
+    const salonId = req.query.salonId as string | undefined;
+
+    if (!serviceId) {
+      throw new AppError('Service ID is required', 400);
+    }
+
+    const { salonId: activeSalonId } = await getUserSalonProfile(userId, salonId);
+
+    // Check if employee exists and belongs to salon
+    const employee = await prisma.employee.findFirst({
+      where: {
+        id: employeeId,
+        salonId: activeSalonId,
+      },
+    });
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    // Delete employee service relationship
+    await prisma.employeeService.deleteMany({
+      where: {
+        employeeId,
+        serviceId,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Service removed from employee successfully',
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    console.error('Remove service from employee error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove service from employee',
     });
   }
 };

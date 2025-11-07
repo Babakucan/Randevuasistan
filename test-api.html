@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    <button onclick="testAPI()">Test Backend Connection</button>
+    <div id="result"></div>
+    
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Test 1: Health check
+                console.log('Testing: http://localhost:3001/health');
+                const healthResponse = await fetch('http://localhost:3001/health');
+                const healthData = await healthResponse.json();
+                console.log('Health check result:', healthData);
+                
+                // Test 2: Login endpoint
+                console.log('Testing: http://localhost:3001/api/auth/login');
+                const loginResponse = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'test@test.com',
+                        password: 'test'
+                    })
+                });
+                const loginData = await loginResponse.json();
+                console.log('Login result:', loginData);
+                
+                resultDiv.innerHTML = `
+                    <h2>Results:</h2>
+                    <p><strong>Health Check:</strong> ${JSON.stringify(healthData)}</p>
+                    <p><strong>Login Test:</strong> ${JSON.stringify(loginData)}</p>
+                    <p><strong>Status:</strong> Backend is reachable!</p>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <h2>Error:</h2>
+                    <p style="color: red;">${error.message}</p>
+                    <p>Check browser console for details.</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
+

@@ -149,11 +149,18 @@ export default function EditAppointmentPage() {
         
         if (allEmployees && Array.isArray(allEmployees)) {
           filteredEmployees = allEmployees.filter((emp: any) => {
-            const hasService = emp.employeeServices?.some((es: any) => 
-              (es.service?.id || es.serviceId) === serviceId
-            )
-            return hasService && (emp.isActive !== false && emp.is_active !== false)
-          })
+            // Aktif olmalı
+            const isActive = emp.isActive !== false && emp.is_active !== false;
+            
+            // Bu hizmeti verebilmeli (employeeServices içinde olmalı ve isAvailable true olmalı)
+            const hasService = emp.employeeServices?.some((es: any) => {
+              const serviceMatches = (es.service?.id || es.serviceId) === serviceId;
+              const isAvailable = es.isAvailable !== false && es.is_available !== false;
+              return serviceMatches && isAvailable;
+            });
+            
+            return isActive && hasService;
+          });
           console.log('✅ Filtered by service assignment:', filteredEmployees)
         } else {
           filteredEmployees = []

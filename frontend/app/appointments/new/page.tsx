@@ -122,7 +122,7 @@ export default function NewAppointmentPage() {
     console.log('🔄 handleServiceChange called with serviceId:', serviceId)
     
     if (serviceId) {
-      await handleServiceChangeWithDate(serviceId, formData.appointment_date)
+      await handleServiceChangeWithDate(serviceId, formData.appointment_date, formData.appointment_time)
     } else {
       // Hizmet seçimi temizlendiyse, çalışanları da temizle
       console.log('⚠️ Service selection cleared, clearing employees')
@@ -148,7 +148,7 @@ export default function NewAppointmentPage() {
     // Eğer hizmet seçiliyse, izin kontrolü ile çalışanları getir
     if (formData.service_id) {
       console.log('✅ Service selected, checking employees with leave days')
-      await handleServiceChangeWithDate(formData.service_id, currentDate)
+      await handleServiceChangeWithDate(formData.service_id, currentDate, currentTime)
     } else {
       console.log('⚠️ No service selected, clearing employees')
       // Hizmet seçili değilse, çalışanları temizle
@@ -163,8 +163,15 @@ export default function NewAppointmentPage() {
     return dayNames[date.getDay()]
   }
 
-  const handleServiceChangeWithDate = async (serviceId: string, appointmentDate?: string) => {
-    console.log('🔄 handleServiceChangeWithDate called with serviceId:', serviceId, 'date:', appointmentDate)
+  const parseTimeToMinutes = (time?: string) => {
+    if (!time) return null
+    const [hours, minutes] = time.split(':').map(part => parseInt(part, 10))
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+    return hours * 60 + minutes
+  }
+
+  const handleServiceChangeWithDate = async (serviceId: string, appointmentDate?: string, appointmentTime?: string) => {
+    console.log('🔄 handleServiceChangeWithDate called with serviceId:', serviceId, 'date:', appointmentDate, 'time:', appointmentTime)
     
     setFormData(prev => ({ ...prev, service_id: serviceId, employee_id: '' }))
     
@@ -175,6 +182,11 @@ export default function NewAppointmentPage() {
         const allEmployees = await employeesApi.getAll()
         console.log('✅ All employees:', allEmployees)
         
+        const selectedService = services.find(service => service.id === serviceId)
+        const serviceDuration = selectedService?.duration || 0
+        const requestedStartMinutes = parseTimeToMinutes(appointmentTime)
+        const normalizedDateName = appointmentDate ? getDayNameFromDate(appointmentDate).toLowerCase() : null
+
         // Service'e atanmış çalışanları filtrele
         let filteredEmployees = []
         
@@ -183,12 +195,43 @@ export default function NewAppointmentPage() {
             // Aktif olmalı
             const isActive = emp.isActive !== false && emp.is_active !== false;
             
-            // Bu hizmeti verebilmeli (employeeServices içinde olmalı)
-            const hasService = emp.employeeServices?.some((es: any) => 
-              (es.service?.id || es.serviceId) === serviceId
-            );
+            // Bu hizmeti verebilmeli (employeeServices içinde olmalı ve isAvailable true olmalı)
+            const hasService = emp.employeeServices?.some((es: any) => {
+              const serviceMatches = (es.service?.id || es.serviceId) === serviceId;
+              const isAvailable = es.isAvailable !== false && es.is_available !== false;
+              return serviceMatches && isAvailable;
+            });
             
-            return isActive && hasService;
+            if (!isActive || !hasService) {
+              return false
+            }
+
+            if (!normalizedDateName) {
+              return true
+            }
+
+            const workingHours = emp.workingHours || emp.working_hours || {}
+            const capitalizedDayKey = normalizedDateName.charAt(0).toUpperCase() + normalizedDateName.slice(1)
+            const dayConfig = workingHours?.[normalizedDateName] || workingHours?.[capitalizedDayKey] || workingHours?.[normalizedDateName.toUpperCase()]
+
+            if (!dayConfig || dayConfig.available === false) {
+              return false
+            }
+
+            if (!appointmentTime || requestedStartMinutes === null) {
+              return true
+            }
+
+            const startMinutes = parseTimeToMinutes(dayConfig.start)
+            const endMinutes = parseTimeToMinutes(dayConfig.end)
+
+            if (startMinutes === null || endMinutes === null) {
+              return true
+            }
+
+            const requestedEnd = requestedStartMinutes + serviceDuration
+
+            return requestedStartMinutes >= startMinutes && requestedEnd <= endMinutes
           });
           console.log('✅ Filtered by service assignment:', filteredEmployees)
         } else {
@@ -203,14 +246,14 @@ export default function NewAppointmentPage() {
            
            // Tarihi gün adına çevir
            const dayName = getDayNameFromDate(checkDate)
+           const normalizedDayName = dayName.toLowerCase()
            console.log('📅 Converted date to day name:', dayName)
            
            const employeesWithoutLeave = filteredEmployees.filter((employee: any) => {
              const leaveDays = employee.leaveDays || employee.leave_days || []
              console.log(`📋 Employee ${employee.name} leave_days:`, leaveDays)
-             
-             // İzin günlerinde değilse true döndür
-             return !leaveDays.includes(dayName)
+
+             return !leaveDays.some((day: string) => day.toLowerCase() === normalizedDayName)
            })
            
            console.log('✅ Employees without leave:', employeesWithoutLeave)
