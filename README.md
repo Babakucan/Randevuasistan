@@ -1,377 +1,206 @@
-# 🏪 Randevu Asistan - Salon Yönetim Sistemi (V2)
+# 🏪 Randevu Asistan V2
 
-Modern salon işletmelerinin günlük operasyonlarını dijitalleştirmek için geliştirilmiş kapsamlı web uygulaması.
+Modern kuaför ve güzellik salonlarının günlük operasyonlarını yönetmesi için geliştirilen, uçtan uca randevu ve müşteri yönetim platformu.
 
-**🎉 V2.0.0 - Yeni Mimari:** Express.js + Prisma + PostgreSQL ile tamamen yeniden yapılandırıldı!
+## ✨ Öne Çıkan Özellikler
 
-## ✨ Özellikler
+### Kimlik Doğrulama ve Çoklu Salon Yönetimi
+- E-posta/şifre ile kayıt ve giriş
+- JWT tabanlı oturum yönetimi (`/auth/register`, `/auth/login`, `/auth/me`)
+- Tek kullanıcı hesabı altında birden fazla salon profili
+- Oturum açıldıktan sonra salon seçimi ve salon bazlı veri izolasyonu
 
-### 🔐 Kimlik Doğrulama
-- Email/şifre ile güvenli giriş
-- JWT token tabanlı authentication
-- Multi-tenant salon desteği
+### Salon İş Akışları
+- Salon profili oluşturma, düzenleme ve silme
+- Salon detayları: iletişim, çalışma saatleri, açıklama, logo
+- Çalışan, müşteri, hizmet ve randevuların aynı salonla ilişkilenmesi
 
-### 👥 Çalışan Yönetimi
-- Çalışan ekleme, düzenleme, silme
-- İzin günleri takibi
-- Çalışma saatleri yönetimi
-- Hizmet atama sistemi
-- Deneyim ve uzmanlık alanları
-- **Performans takibi** (randevu sayısı, kazanç istatistikleri)
+### Kaynak Yönetimi
+- **Hizmetler:** Süre, fiyat, kategori ve aktif/pasif durumu ile CRUD
+- **Çalışanlar:** İletişim bilgileri, uzmanlıklar, çalışma saatleri, izin günleri ve aktiflik durumu
+- **Çalışan ↔ Hizmet** eşleştirmesi (`POST /employees/:id/services`) ile servis bazlı yetkinlik tanımı
+- **Müşteriler:** İletişim bilgileri, notlar, son randevular ve hızlı arama
 
-### 🎯 Hizmet Yönetimi
-- Hizmet ekleme, düzenleme, silme
-- Fiyat ve süre belirleme
-- Kategori sistemi
-- Aktif/pasif durumu
-- **Performans takibi** (randevu sayısı, kazanç istatistikleri)
+### Randevu ve Dashboard
+- Randevu oluşturma, düzenleme, silme ve durum güncelleme
+- Çalışan/hizmet ilişkileri doğrultusunda çalışan seçimi (isteğe bağlı)
+- Randevu kaynağı (`manual`, `whatsapp`, `phone`, `ai`) alanları
+- Dashboard üzerinden toplam randevu, müşteri, çalışan, hizmet sayıları ve gelir metrikleri
+- Son 10 aktivite için birleşik zaman akışı (randevu, müşteri, çalışan, hizmet)
 
-### 👤 Müşteri Yönetimi
-- Müşteri ekleme, düzenleme, silme
-- İletişim bilgileri
-- Müşteri notları
-- Arama ve filtreleme
-- **Aktif/Pasif gösterimi** (randevu geçmişine göre)
-- **Randevu detayları** (son randevu, aktif randevu sayısı)
+### İstemci Uygulaması (Next.js)
+- Her ana kaynak için liste / detay / oluşturma-düzenleme sayfaları
+- Hızlı işlem modalları (dashboard üzerinden müşteri, çalışan, hizmet, randevu)
+- Arama, tarih filtresi ve sayfalama yetenekleri
+- `frontend/app` dizininde kaynak bazlı yönlendirme (App Router)
 
-### 📅 Akıllı Randevu Sistemi
-- Otomatik çalışan önerisi
-- Çalışan müsaitlik kontrolü
-- **Hizmet bazlı çalışan filtreleme** (sadece hizmeti veren çalışanlar)
-- İzin günleri kontrolü
-- Çalışma saatleri kontrolü
-- Randevu düzenleme/silme
-- Otomatik bitiş saati hesaplama
+### Yardımcı Scriptler
+- `backend/scripts/seed-user-data.ts`: örnek salon, hizmet, çalışan, müşteri ve randevu seed’i
+- `backend/scripts/check-salons.ts`: veritabanındaki salonların durumunu raporlar
+- `backend/scripts/update-salon-name.ts`: salon adını güncellemek için örnek script
+- `scripts/deploy-*.sh|ps1`: VPS dağıtımı için otomasyon komutları
 
-### 🏢 Multi-Tenant Salon Yönetimi
-- **Birden fazla salon profili** (bir kullanıcı birden fazla salon)
-- Salon ekleme, düzenleme, silme
-- Aktif salon seçimi
-- Salon bazlı veri izolasyonu
+### Planlanan (Henüz Üretimde Değil)
+- WhatsApp & telefon görüşmesi ekranlarının gerçek veri ile entegrasyonu
+- AI destekli otomatik cevap ve randevu önerileri
+- Gelişmiş bildirim ve görev otomasyonları
 
-### 🤖 AI Entegrasyonu (Gelecek)
-- OpenAI API entegrasyonu (VPS üzerinde)
-- Otomatik müşteri yanıtları
-- Randevu önerileri
-- Sentiment analizi
-- Conversation analytics
+## 🛠️ Teknoloji Yığını
 
-### 🔍 Arama ve Filtreleme
-- Tüm listelerde arama
-- Tarih bazlı filtreleme
-- Durum bazlı filtreleme
+| Katman | Teknolojiler |
+| --- | --- |
+| Frontend | Next.js 15, React 18, TypeScript, Tailwind CSS, Lucide Icons |
+| Backend | Node.js 18+, Express 4, TypeScript, Prisma ORM, Zod, bcryptjs |
+| Veritabanı | PostgreSQL 14+ |
+| Güvenlik | Helmet, CORS, JWT, rate limiting (opsiyonel) |
+| Paylaşılan | `shared/` içinde Zod tabanlı tip tanımları |
+| DevOps | PM2, Nginx, Docker (PostgreSQL için önerilen), deploy scriptleri |
 
-## 🛠️ Teknoloji Stack
+## 📁 Depo Yapısı
 
-### Frontend
-- **Next.js 15** - React framework (App Router)
-- **TypeScript** - Tip güvenliği
-- **Tailwind CSS** - Styling
-- **Lucide React** - İkonlar
-- **Custom API Client** - REST API entegrasyonu
+```
+.
+├── backend/        # Express + Prisma REST API
+├── frontend/       # Next.js 15 istemci uygulaması
+├── shared/         # Ortak TypeScript tipleri
+├── documents/      # Mimari, API ve süreç dokümantasyonu
+├── scripts/        # VPS ve Hostinger dağıtım scriptleri
+└── docs/           # (Boş) ek dökümanlar için yer tutucu
+```
 
-### Backend
-- **Node.js 18+** - JavaScript runtime
-- **Express.js 4.18+** - Web framework
-- **TypeScript 5.3+** - Backend tip güvenliği
-- **Prisma 5.7+** - Modern ORM
-- **PostgreSQL** - İlişkisel veritabanı
-- **JWT** - Token-based authentication
-- **Zod** - Schema validation
-- **bcryptjs** - Password hashing
+## 🚀 Hızlı Başlangıç
 
-### Security
-- **Helmet** - Security headers
-- **CORS** - Cross-origin resource sharing
-- **express-rate-limit** - Rate limiting
-- **JWT** - Secure authentication
+### 1. Gerekli Yazılımlar
+- Node.js 18 veya üzeri (npm ≥ 9)
+- PostgreSQL 14 veya üzeri
+- Git
 
-### Deployment
-- **VPS** - Production hosting
-- **PM2** - Process manager
-- **Nginx** - Reverse proxy
-- **Let's Encrypt** - SSL/HTTPS
-
-## 🚀 Kurulum
-
-### Gereksinimler
-- Node.js 18+ (LTS önerilir)
-- npm veya yarn
-- PostgreSQL 14+
-- OpenAI API key (opsiyonel, gelecekte)
-
-### 1. Repository Klonlama
+### 2. Depoyu Klonlayın
 ```bash
 git clone https://github.com/Babakucan/Randevuasistan.git
 cd Randevuasistan
 ```
 
-### 2. Frontend Kurulumu
+### 3. Bağımlılıkları Kurun
 ```bash
-cd frontend
-npm install
-cp .env.example .env.local
-npm run dev
+npm install           # kök paket.json (workspaces)
+cd frontend && npm install
+cd ../backend && npm install
 ```
+> Alternatif: `npm run install:all`
 
-### 3. Backend Kurulumu
-```bash
-cd backend
-npm install
-cp env.example .env
-npm run dev
-```
+### 4. Ortam Dosyalarını Hazırlayın
+- `frontend/.env.example` → `.env.local`
+- `backend/env.example` → `.env`
 
-### 4. Database Kurulumu
-
-#### PostgreSQL ile Docker (Önerilen)
-```bash
-docker run --name postgres-randevuasistan \
-  -e POSTGRES_USER=randevuasistan \
-  -e POSTGRES_PASSWORD=your_password \
-  -e POSTGRES_DB=randevuasistan_db \
-  -p 5432:5432 \
-  -d postgres:15
-```
-
-#### PostgreSQL Manuel Kurulum
-```bash
-# PostgreSQL kurulumu (Ubuntu/Debian)
-sudo apt install postgresql postgresql-contrib -y
-
-# Database ve kullanıcı oluşturma
-sudo -u postgres psql
-CREATE USER randevuasistan WITH PASSWORD 'your_password';
-CREATE DATABASE randevuasistan_db OWNER randevuasistan;
-\q
-```
-
-### 5. Prisma Database Setup
-```bash
-cd backend
-npx prisma generate
-npx prisma db push
-```
-
-### 6. Environment Değişkenleri
-
-**Frontend (.env.local):**
+Örnek değerler:
 ```env
+# frontend/.env.local
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
-
-**Backend (.env):**
 ```env
+# backend/.env
 PORT=3001
 NODE_ENV=development
 DATABASE_URL="postgresql://randevuasistan:your_password@localhost:5432/randevuasistan_db?schema=public"
-JWT_SECRET=your_very_secure_jwt_secret_key_here
+JWT_SECRET=super_secret_key
 JWT_EXPIRES_IN=7d
 CORS_ORIGIN=http://localhost:3000
-OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-## 📊 Veritabanı Şeması
+### 5. Veritabanını Kurun
+- PostgreSQL yerel kurulum veya Docker:
+  ```bash
+  docker run --name postgres-randevu \
+    -e POSTGRES_USER=randevuasistan \
+    -e POSTGRES_PASSWORD=your_password \
+    -e POSTGRES_DB=randevuasistan_db \
+    -p 5432:5432 \
+    -d postgres:15
+  ```
+- Prisma şema ve client kurulumları:
+  ```bash
+  cd backend
+  npx prisma db push
+  npx prisma generate
+  # İsteğe bağlı örnek veriler
+  npx ts-node scripts/seed-user-data.ts
+  ```
 
-### Ana Modeller (Prisma)
-- `User` - Kullanıcı hesapları
-- `SalonProfile` - Salon profilleri (multi-tenant)
-- `Employee` - Çalışan bilgileri
-- `Service` - Hizmet bilgileri
-- `Customer` - Müşteri bilgileri
-- `Appointment` - Randevu bilgileri
-- `EmployeeService` - Çalışan-hizmet ilişkileri
-- `AIConversation` - AI konuşma geçmişi (gelecek)
-- `CallHistory` - Arama geçmişi (gelecek)
-- `CallRecording` - Arama kayıtları (gelecek)
-- `ConversationAnalytic` - Konuşma analitikleri (gelecek)
-- `SalonSetting` - Salon ayarları (gelecek)
+### 6. Geliştirme Sunucularını Başlatın
+- Kök dizinden aynı anda:
+  ```bash
+  npm run dev
+  ```
+- veya manuel:
+  ```bash
+  cd backend && npm run dev   # http://localhost:3001
+  cd frontend && npm run dev  # http://localhost:3000
+  ```
 
-Detaylı şema için [ARCHITECTURE.md](./documents/ARCHITECTURE.md) dosyasına bakın.
+## 📚 Dokümantasyon Kaynakları
+- `documents/ARCHITECTURE.md`: katmanlar, veri akışı, modüller
+- `documents/API.md`: REST uçları, istek/yanıt sözleşmeleri
+- `documents/DEPLOYMENT.md`, `DEPLOYMENT_INSTRUCTIONS.md`, `VPS_DEPLOYMENT_CHECKLIST.md`: sunucu kurulumu ve otomasyon
+- `documents/PRD.md`: ürün gereksinimleri
+- `documents/CHANGELOG.md`: sürüm günlüğü
+- `documents/V2_ROADMAP.md`: kısa & orta vadeli yol haritası
 
-## 🎨 Kullanıcı Arayüzü
+## 🗄️ Prisma Modelleri
+Prisma şemasında yer alan başlıca modeller:
+- `User`, `SalonProfile`
+- `Service`, `Employee`, `EmployeeService`
+- `Customer`, `Appointment`
+- Gelecek için ayrılmış: `AiConversation`, `CallHistory`, `CallRecording`, `ConversationAnalytic`, `SalonSetting`
 
-### Tasarım Prensipleri
-- **Renk Paleti:** Gri ve siyah tonları (gradient)
-- **Responsive:** Mobil uyumlu tasarım
-- **UX:** Sezgisel navigasyon
-- **Glassmorphism:** Modern görsel efektler
+Ayrıntı için `backend/prisma/schema.prisma` ve `documents/ARCHITECTURE.md` dosyalarına bakın.
 
-### Sayfa Yapısı
-- **Dashboard** - Genel bakış ve istatistikler (salon seçici ile)
-- **Salonlar** - Salon yönetimi (CRUD)
-- **Çalışanlar** - Çalışan yönetimi (performans takibi ile)
-- **Hizmetler** - Hizmet yönetimi (performans takibi ile)
-- **Müşteriler** - Müşteri yönetimi (aktif/pasif gösterimi ile)
-- **Randevular** - Randevu yönetimi
-- **Phone Calls** - Arama yönetimi (migration gerekli)
-- **WhatsApp** - WhatsApp yönetimi (migration gerekli)
+## 🧪 Test ve Kalite
+- Şu an otomatik test bulunmuyor; manuel senaryolar `documents/DAILY_TASKS.md` içinde listelenmiştir.
+- Kod stili için:
+  ```bash
+  cd frontend && npm run lint
+  npm run format        # kök dizinden Prettier
+  ```
+- TypeScript tip kontrolü:
+  ```bash
+  cd frontend && npm run type-check
+  cd backend && npm run build   # tsc denetimleri derleme sırasında yapılır
+  ```
 
-## 🔒 Güvenlik
+## 🚢 Dağıtım
+- PM2 ile Node.js süreç yönetimi ve Nginx reverse proxy önerilir.
+- Kapsamlı yönergeler: `documents/DEPLOYMENT.md`, `VPS_DEPLOYMENT_CHECKLIST.md`, `deploy.sh`
+- Hostinger entegrasyonu için örnekler: `HOSTINGER_API_GUIDE.md`, `scripts/hostinger-*.js`
 
-### Authentication & Authorization
-- **JWT token** tabanlı kimlik doğrulama
-- **Password hashing** (bcryptjs)
-- **Token expiration** (7 gün)
-- **Salon bazlı veri izolasyonu** (multi-tenant)
-- Kullanıcı sadece kendi salonlarına erişebilir
-
-### API Security
-- **CORS** koruması
-- **Rate limiting** (express-rate-limit)
-- **Helmet** security headers
-- **Input validation** (Zod schema validation)
-- **SQL injection** koruması (Prisma ORM ile otomatik)
-
-## 📱 Responsive Tasarım
-
-Uygulama tüm cihazlarda mükemmel çalışır:
-- 📱 Mobil telefonlar
-- 📱 Tabletler
-- 💻 Desktop bilgisayarlar
-
-## 🧪 Test
-
-### Manuel Test Senaryoları
-1. **Kimlik Doğrulama**
-   - Giriş yapma
-   - Çıkış yapma
-   - Salon profili oluşturma
-
-2. **CRUD İşlemleri**
-   - Çalışan ekleme/düzenleme/silme
-   - Hizmet ekleme/düzenleme/silme
-   - Müşteri ekleme/düzenleme/silme
-   - Randevu oluşturma/düzenleme/silme
-
-3. **AI ve Otomasyon**
-   - AI konuşma işleme
-   - n8n workflow testleri
-   - Webhook entegrasyonları
-
-## 🚀 Deployment
-
-Detaylı deployment rehberi için [DEPLOYMENT.md](./documents/DEPLOYMENT.md) dosyasına bakın.
-
-### VPS Deployment (Önerilen)
-
-#### Sunucu Gereksinimleri
-- Ubuntu 20.04+ / Debian 11+
-- 2+ vCPU, 4+ GB RAM
-- PostgreSQL 14+
-
-#### Hızlı Kurulum
-```bash
-# 1. Proje klonlama
-git clone https://github.com/Babakucan/Randevuasistan.git
-cd Randevuasistan
-
-# 2. Backend kurulumu
-cd backend
-npm install
-npm run build
-pm2 start dist/index.js --name randevuasistan-backend
-
-# 3. Frontend kurulumu
-cd ../frontend
-npm install
-npm run build
-pm2 start npm --name randevuasistan-frontend -- start
-
-# 4. Nginx reverse proxy kurulumu
-# (Detaylar için DEPLOYMENT.md'ye bakın)
-
-# 5. SSL kurulumu
-sudo certbot --nginx -d yourdomain.com
-```
-
-### Environment Variables
-Production'da şu environment variables'ları ayarlayın:
-- `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - Güçlü JWT secret key
-- `CORS_ORIGIN` - Production domain
-- `OPENAI_API_KEY` - (Gelecekte kullanılacak)
-
-## 📈 Performans
-
-### Optimizasyonlar
-- Lazy loading
-- Image optimization
-- Code splitting
-- Caching stratejileri
-- Rate limiting
-
-### Database Optimizasyonu
-- İndeksler
-- Query optimizasyonu
-- Connection pooling
-
-## 📚 Dokümantasyon
-
-Detaylı dokümantasyon için [documents](./documents/) klasörüne bakın:
-
-- **[ARCHITECTURE.md](./documents/ARCHITECTURE.md)** - Mimari detayları ve teknik bilgiler
-- **[V2_ROADMAP.md](./documents/V2_ROADMAP.md)** - Yol haritası ve gelecek planları
-- **[CHANGELOG.md](./documents/CHANGELOG.md)** - Versiyon geçmişi ve değişiklikler
-- **[DEPLOYMENT.md](./documents/DEPLOYMENT.md)** - VPS deployment rehberi
-- **[PRD.md](./documents/PRD.md)** - Product Requirements Document
-
-## 🔄 Gelecek Özellikler
-
-Detaylı planlar için [V2_ROADMAP.md](./documents/V2_ROADMAP.md) dosyasına bakın.
-
-### V2.1.0 (Planlanan)
-- 🧹 Kod temizliği ve optimizasyon
-- 🐛 Bug fix'ler
-- 📝 Dokümantasyon iyileştirmeleri
-
-### V2.2.0 (Planlanan)
-- 🤖 AI entegrasyonları (VPS üzerinde)
-- 📞 Call management
-- 🔔 Notification system
-
-### V3.0.0 (Gelecek)
-- 📱 Mobil uygulama (React Native)
-- 📊 Gelişmiş raporlama
-- 💳 Ödeme sistemi entegrasyonu
-- ⚡ Performance optimizasyonları
+## 🧭 Yol Haritası
+- Kısa vade: dokümantasyon senkronizasyonu, UI temizlikleri, kalite iyileştirmeleri
+- Orta vade: AI destekli senaryolar, çağrı/WhatsApp modüllerinin backend bağlantıları
+- Ayrıntılı maddeler için `documents/V2_ROADMAP.md` dosyasını inceleyin
 
 ## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add amazing feature'`)
-4. Branch'inizi push edin (`git push origin feature/amazing-feature`)
+1. Depoyu fork'layın
+2. Feature branch açın (`git checkout -b feature/isim`)
+3. Değişiklikleri commit'leyin (`git commit -m "Açıklama"`)
+4. Branch’i push edin (`git push origin feature/isim`)
 5. Pull Request oluşturun
 
 ## 📝 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](./LICENSE) dosyasına bakın.
+Bu proje MIT lisansı altındadır. Detaylar için `LICENSE` dosyasına bakın.
 
 ## 📞 İletişim
-
-**Geliştirici:** Anıl Yazıcı  
-**Email:** Anilyazici1238@gmail.com  
-**GitHub:** [GitHub Profili]
+- **Geliştirici:** Anıl Yazıcı  
+- **E-posta:** anilyazici1238@gmail.com  
+- **GitHub:** [GitHub Profili]
 
 ## 🙏 Teşekkürler
-
-- [Next.js](https://nextjs.org/) - React framework
-- [Express.js](https://expressjs.com/) - Web framework
-- [Prisma](https://www.prisma.io/) - Modern ORM
-- [PostgreSQL](https://www.postgresql.org/) - Veritabanı
-- [Tailwind CSS](https://tailwindcss.com) - CSS framework
-- [Lucide](https://lucide.dev) - İkonlar
-- [TypeScript](https://www.typescriptlang.org/) - Tip güvenliği
-
----
-
-## 📦 Versiyonlar
-
-- **V2.0.0** - Yeni mimari (Express.js + Prisma + PostgreSQL) ✅
-- **V2.1.0** - Temizlik ve optimizasyon (Planlanan) 🔄
-- **V2.2.0** - AI entegrasyonları (Planlanan) 📋
+- [Next.js](https://nextjs.org/)
+- [Express.js](https://expressjs.com/)
+- [Prisma](https://www.prisma.io/)
+- [PostgreSQL](https://www.postgresql.org/)
+- [Tailwind CSS](https://tailwindcss.com)
+- [Lucide](https://lucide.dev)
+- [TypeScript](https://www.typescriptlang.org/)
 
 ---
-
-⭐ Bu projeyi beğendiyseniz yıldız vermeyi unutmayın!
+⭐ Projeyi beğendiyseniz GitHub’da yıldız vermeyi unutmayın!

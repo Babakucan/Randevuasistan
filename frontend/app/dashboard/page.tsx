@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { capitalizeName } from '@/lib/utils';
-import { authApi, dashboardApi, customersApi, servicesApi, employeesApi, appointmentsApi, removeToken, getToken, getCurrentSalonId, setCurrentSalonId } from '@/lib/api';
+import { authApi, dashboardApi, customersApi, servicesApi, employeesApi, appointmentsApi, getToken, getCurrentSalonId, setCurrentSalonId } from '@/lib/api';
 import Link from 'next/link';
 import { 
   Calendar, 
@@ -13,16 +13,10 @@ import {
   Plus, 
   Clock, 
   User,
-  Settings,
-  Bell,
-  LogOut,
   ChevronRight,
-  Eye,
   Phone,
   MessageCircle,
   BarChart3,
-  Building,
-  ChevronDown
 } from 'lucide-react';
 
 interface RecentActivity {
@@ -76,15 +70,12 @@ export default function DashboardPage() {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showQuickAppointment, setShowQuickAppointment] = useState(false);
   const [showQuickCustomer, setShowQuickCustomer] = useState(false);
   const [showQuickEmployee, setShowQuickEmployee] = useState(false);
   const [showQuickService, setShowQuickService] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
   const [appointmentNotifications, setAppointmentNotifications] = useState<AppointmentNotification[]>([]);
-  const [showSalonDropdown, setShowSalonDropdown] = useState(false);
 
   const [weeklyData, setWeeklyData] = useState<ChartData>({ labels: [], data: [], colors: [] });
   const [serviceData, setServiceData] = useState<ChartData>({ labels: [], data: [], colors: [] });
@@ -131,77 +122,51 @@ export default function DashboardPage() {
 
 
 
-  useEffect(() => {
-    checkUser();
-  }, []);
+
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (showNotifications && !target.closest('.notifications-dropdown')) {
-        setShowNotifications(false);
-      }
-      if (!target.closest('.profile-menu')) {
-        setShowProfileMenu(false);
-      }
-      if (showSalonDropdown && !target.closest('.salon-dropdown')) {
-        setShowSalonDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showNotifications]);
-
-  const checkUser = async () => {
-    try {
-      const token = getToken();
-      if (!token) {
-        router.push('/login');
-        setLoading(false);
-        return;
-      }
-      const user = await authApi.getCurrentUser();
-      if (user) {
-        setUser(user);
-        
-        // Salon profil kontrolü ve currentSalonId ayarlama
-        if (user.salonProfiles && user.salonProfiles.length > 0) {
-          let salonId = getCurrentSalonId();
-          
-          // Eğer currentSalonId yoksa veya geçersizse, ilk salon profilini kullan
-          if (!salonId || !user.salonProfiles.find((sp: any) => sp.id === salonId)) {
-            salonId = user.salonProfiles[0].id;
-            // ÖNEMLİ: setCurrentSalonId'yi API çağrılarından ÖNCE yap
-            setCurrentSalonId(salonId);
-          }
-          
-          // User geldikten sonra verileri yükle
-          try {
-            await Promise.all([
-              loadStats(salonId),
-              loadRecentActivities(salonId),
-              loadQuickAppointmentData(salonId),
-            ]);
-          } catch (error) {
-            console.error('Error loading dashboard data:', error);
-            // Hata olsa bile loading'i kapat
-          }
-        } else {
-          console.error('No salon profiles found for user');
+    const loadUserData = async () => {
+      try {
+        const token = getToken();
+        if (!token) {
+          setLoading(false);
+          return;
         }
+        const currentUser = await authApi.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          
+          // Salon profil kontrolü ve currentSalonId ayarlama
+          if (currentUser.salonProfiles && currentUser.salonProfiles.length > 0) {
+            let salonId = getCurrentSalonId();
+            
+            // Eğer currentSalonId yoksa veya geçersizse, ilk salon profilini kullan
+            if (!salonId || !currentUser.salonProfiles.find((sp: any) => sp.id === salonId)) {
+              salonId = currentUser.salonProfiles[0].id;
+              setCurrentSalonId(salonId);
+            }
+            
+            // User geldikten sonra verileri yükle
+            try {
+              await Promise.all([
+                loadStats(salonId),
+                loadRecentActivities(salonId),
+                loadQuickAppointmentData(salonId),
+              ]);
+            } catch (error) {
+              console.error('Error loading dashboard data:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error checking user:', error);
-      removeToken();
-      router.push('/login');
-    } finally {
-      // Her durumda loading'i kapat
-      setLoading(false);
-    }
-  };
+    };
+
+    loadUserData();
+  }, []);
 
   const loadDashboardData = async (userId: string) => {
     try {
@@ -331,14 +296,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      removeToken();
-      router.push('/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
 
   const handleActivityClick = (activity: RecentActivity) => {
     switch (activity.type) {
@@ -357,17 +314,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
-    switch (notification.type) {
-      case 'new_customer':
-        router.push(`/customers/${notification.target_id}`);
-        break;
-      case 'new_appointment':
-        router.push(`/appointments/${notification.target_id}`);
-        break;
-    }
-    setShowNotifications(false);
-  };
 
   // Quick Appointment Add Function
   const handleQuickAppointmentAdd = async () => {
@@ -453,7 +399,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 border-2 border-gray-300 border-t-white rounded-full animate-spin"></div>
           <span className="text-gray-300">Yükleniyor...</span>
@@ -463,191 +409,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-      {/* Header */}
-      <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 relative z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              {/* Salon Selector */}
-              <div className="relative salon-dropdown">
-                <button
-                  onClick={() => setShowSalonDropdown(!showSalonDropdown)}
-                  className="flex items-center space-x-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                >
-                  <Building className="w-4 h-4 text-gray-300" />
-                  <span className="text-white font-medium">
-                    {user?.salonProfiles?.find((sp: any) => sp.id === getCurrentSalonId())?.name || 
-                     user?.salonProfiles?.[0]?.name || 'Salon'}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-gray-300" />
-                </button>
-                
-                {showSalonDropdown && user?.salonProfiles && (
-                  <div className="absolute left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999]">
-                    <div className="py-2">
-                      <div className="px-4 py-2 border-b border-gray-700">
-                        <div className="text-xs text-gray-400 mb-1">Aktif Salon</div>
-                        <div className="text-sm text-white font-medium">
-                          {user.salonProfiles.find((sp: any) => sp.id === getCurrentSalonId())?.name || 
-                           user.salonProfiles[0]?.name}
-                        </div>
-                      </div>
-                      {user.salonProfiles.map((salon: any) => (
-                        <button
-                          key={salon.id}
-                          onClick={() => {
-                            setCurrentSalonId(salon.id);
-                            setShowSalonDropdown(false);
-                            window.location.reload();
-                          }}
-                          className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                            getCurrentSalonId() === salon.id
-                              ? 'bg-blue-600 text-white'
-                              : 'text-gray-300 hover:bg-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{salon.name}</span>
-                            {getCurrentSalonId() === salon.id && (
-                              <span className="text-xs">✓</span>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                      <div className="border-t border-gray-700 mt-2 pt-2">
-                        <Link
-                          href="/salons"
-                          onClick={() => setShowSalonDropdown(false)}
-                          className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                        >
-                          <Settings className="w-4 h-4" />
-                          <span>Salon Yönetimi</span>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <span className="text-gray-400">|</span>
-              <span className="text-gray-300">Yönetim Paneli</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              {/* Notifications */}
-              <div className="relative notifications-dropdown z-[9998]">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors z-30"
-                >
-                  <Bell className="w-5 h-5 text-gray-300" />
-                  {notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                      {notifications.length}
-                    </span>
-                  )}
-                </button>
-                
-                {/* Notifications Dropdown */}
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999] max-h-96 overflow-hidden">
-                    <div className="p-4">
-                      <h3 className="text-white font-semibold mb-3">Bildirimler</h3>
-                      {notifications.length === 0 ? (
-                        <p className="text-gray-400 text-sm">Yeni bildirim yok</p>
-                      ) : (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {notifications.map((notification) => (
-                            <button
-                              key={notification.id}
-                              onClick={() => handleNotificationClick(notification)}
-                              className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-white font-medium text-sm truncate">{notification.title}</h4>
-                                  <p className="text-gray-400 text-xs mt-1 line-clamp-2">{notification.message}</p>
-                                  <p className="text-gray-500 text-xs mt-2">
-                                    {new Date(notification.created_at).toLocaleString('tr-TR')}
-                                  </p>
-                                </div>
-                                <Eye className="w-4 h-4 text-gray-400 ml-2 flex-shrink-0" />
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Profile Menu */}
-              <div className="relative profile-menu z-[9998]">
-                <button 
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center space-x-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors z-30"
-                >
-                  <User className="w-5 h-5 text-gray-300" />
-                </button>
-                
-                {/* Profile Dropdown */}
-                {showProfileMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999]">
-                    <div className="py-2">
-                      <div className="px-4 py-2 border-b border-gray-700">
-                        <div className="text-sm text-gray-300">{user?.email}</div>
-                        <div className="text-xs text-gray-500">Yönetici</div>
-                      </div>
-                      <button
-                        onClick={() => router.push('/appointments')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                      >
-                        Randevular
-                      </button>
-                      <button
-                        onClick={() => router.push('/employees')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                      >
-                        Çalışanlar
-                      </button>
-                      <button
-                        onClick={() => router.push('/customers')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                      >
-                        Müşteriler
-                      </button>
-                      <button
-                        onClick={() => router.push('/services')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                      >
-                        Hizmetler
-                      </button>
-                      <button
-                        onClick={() => router.push('/salons')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                      >
-                        <Building className="w-4 h-4 inline mr-2" />
-                        Salon Yönetimi
-                      </button>
-                      <div className="border-t border-gray-700 mt-2 pt-2">
-              <button
-                onClick={handleSignOut}
-                          className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
-              >
-                          Çıkış Yap
-              </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-        {/* Main Content */}
-        <div className="flex-1 p-8">
+    <div>
         {/* Welcome Section */}
         <div className="mb-8">
           <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
@@ -1690,8 +1452,6 @@ export default function DashboardPage() {
       )}
 
       {/* Recent Activities and Quick Actions */}
-        </div>
-      </div>
     </div>
   );
 }

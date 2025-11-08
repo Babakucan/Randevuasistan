@@ -18,42 +18,42 @@
 
 ---
 
-## 🚀 V2.1.0 - Temizlik ve Optimizasyon (Planlanan)
+## 🚀 V2.1.0 - Temizlik ve Optimizasyon (Devam Ediyor)
 
-**Hedef Tarih:** Yakın gelecek  
-**Durum:** 🔄 Planlanıyor
+**Hedef Tarih:** 2025 Q4  
+**Durum:** 🟡 Dokümantasyon tamamlandı, kod/bakım işleri kademeli ilerliyor
 
 ### 🧹 Kod Temizliği
-- [ ] Gereksiz SQL dosyalarının temizlenmesi
-- [ ] Eski Supabase referanslarının kaldırılması
-- [ ] Test dosyalarının temizlenmesi
-- [ ] Backup dosyalarının kaldırılması
-- [ ] `.gitignore` güncellemesi
+- [ ] Depodaki eski SQL / backup dosyalarının kaldırılması
+- [ ] Supabase referanslarının tamamen temizlenmesi (kod ve döküman)
+- [ ] Test/örnek dosyalarının gözden geçirilmesi
+- [x] `.gitignore` güncellemesi
 
 ### 🐛 Bug Fix'ler
-- [ ] Çalışan düzenleme sayfası buton state yönetimi
-- [ ] Employee Service assignment endpoint'i
-- [ ] Phone Calls sayfası migration (Supabase → New API)
-- [ ] WhatsApp sayfası migration (Supabase → New API)
+- [x] Çalışan düzenleme sayfası buton state yönetimi
+- [x] Employee Service assignment endpoint'i
+- [ ] Phone Calls sayfası (backend entegrasyonu bekleniyor)
+- [ ] WhatsApp sayfası (backend entegrasyonu bekleniyor)
 
 ### 📝 Dokümantasyon
-- [ ] ARCHITECTURE.md oluşturuldu ✅
-- [ ] V2_ROADMAP.md oluşturuldu ✅
-- [ ] CHANGELOG.md oluşturulacak
-- [ ] DEPLOYMENT.md oluşturulacak
-- [ ] README.md güncellemesi
-- [ ] API dokümantasyonu
+- [x] ARCHITECTURE.md
+- [x] V2_ROADMAP.md
+- [x] CHANGELOG.md
+- [x] DEPLOYMENT.md & checklist dokümanları
+- [x] README.md
+- [x] API dokümantasyonu
 
 ### 🔧 Kod İyileştirmeleri
 - [ ] TypeScript tip güvenliği iyileştirmeleri
 - [ ] Error handling standartlaştırma
 - [ ] Code formatting (Prettier)
 - [ ] ESLint kuralları iyileştirme
+- [ ] Rate limit middleware konfigürasyonu
 
 ### 🧪 Test
 - [ ] Unit testler (opsiyonel)
 - [ ] Integration testler (opsiyonel)
-- [ ] Manuel test senaryoları dokümantasyonu
+- [ ] Manuel test senaryoları dökümantasyonunun güncellenmesi
 
 ---
 
@@ -130,15 +130,17 @@
 2. Advanced monitoring
 3. Performance optimizasyonları
 
+> Not: Orta ve düşük öncelikli maddeler için iş gereksinimleri `documents/PRD.md` ile eşleştirilecek.
+
 ---
 
 ## 🎯 Kısa Vadeli Hedefler (1-2 Ay)
 
 ### Tamamlanması Gerekenler
 - [x] V2.0.0 - Yeni mimari ✅
-- [ ] V2.1.0 - Temizlik ve optimizasyon
-- [ ] VPS deployment
-- [ ] Production environment setup
+- [ ] V2.1.0 - Temizlik ve optimizasyon (devam ediyor)
+- [x] VPS deployment scriptleri hazır (hosted)
+- [ ] Production environment için izleme ve bakım planı
 
 ### Başlanacaklar
 - [ ] AI entegrasyonları planlama
@@ -169,7 +171,7 @@
 
 ---
 
-**Son Güncelleme:** V2.0.0  
-**Sonraki Versiyon:** V2.1.0  
+**Son Güncelleme:** V2.1.1 (Kasım 2025)  
+**Sonraki Versiyon:** V2.2.0  
 **Dokümantasyon Tarihi:** 2025
 

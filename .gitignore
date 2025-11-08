@@ -36,6 +36,7 @@ dist/
 # IDE
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 
@@ -133,3 +134,7 @@ tests/
 *.tmp
 *.temp
 deneme.txt
+
+# Sensitive deployment docs
+DEPLOYMENT_INSTRUCTIONS.md
+VPS_INFO.md

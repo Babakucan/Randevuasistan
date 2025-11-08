@@ -1,5 +1,7 @@
 # Randevuasistan - Görev Yönetimi
 
+> **Güncelleme Notu (Kasım 2025):** Bu görev listesi Supabase tabanlı V1 planlamasından kalmıştır. V2 (Express + Prisma) iş listeleri ve öncelikleri için `documents/V2_ROADMAP.md` ve `documents/CHANGELOG.md` dosyalarına başvurun. Aşağıdaki maddeler arşiv niteliğindedir.
+
 ## 📋 Proje Durumu
 **Mevcut Durum**: Proje Başlangıç Aşaması 🚀  
 **Sonraki Milestone**: Frontend Geliştirme & Veritabanı Kurulumu 🎯

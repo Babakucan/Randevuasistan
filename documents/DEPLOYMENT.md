@@ -109,11 +109,11 @@ nano .env
 
 `.env` dosyası içeriği:
 ```env
-# Server
+# Sunucu
 PORT=3001
 NODE_ENV=production
 
-# Database
+# Veritabanı
 DATABASE_URL="postgresql://randevuasistan:güçlü_şifre_buraya@localhost:5432/randevuasistan_db?schema=public"
 
 # JWT
@@ -123,12 +123,8 @@ JWT_EXPIRES_IN=7d
 # CORS
 CORS_ORIGIN=https://yourdomain.com
 
-# AI (Gelecekte kullanılacak)
+# AI (opsiyonel, gelecekte kullanılacak)
 OPENAI_API_KEY=your_openai_api_key_here
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
 ```
 
 #### Frontend `.env.local` Dosyası
@@ -141,9 +137,9 @@ nano .env.local
 
 `.env.local` dosyası içeriği:
 ```env
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
-# veya backend aynı domain'deyse:
-# NEXT_PUBLIC_API_URL=https://yourdomain.com/api
+NEXT_PUBLIC_API_URL=https://yourdomain.com/api
+# Backend'i ayrı subdomain altında çalıştırıyorsanız:
+# NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 ```
 
 ### 3. Bağımlılıkları Yükleme
@@ -151,6 +147,9 @@ NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 ```bash
 # Root dizinde
 npm install
+
+# Tüm workspace bağımlılıklarını otomatik kurmak için (isteğe bağlı)
+# npm run install:all
 
 # Backend
 cd backend
@@ -172,6 +171,7 @@ npx prisma db push
 ```
 
 **Not:** Production'da `prisma db push` yerine `prisma migrate deploy` kullanılmalıdır.
+Tek komutla kurulum için `scripts/deploy-all.sh` ve `scripts/deploy-to-vps.sh` dosyalarını inceleyin; ihtiyaçlarınıza göre düzenleyip çalıştırabilirsiniz.
 
 ---
 
@@ -416,7 +416,7 @@ sudo ufw enable
 ### API Güvenliği
 
 - JWT secret'ı güçlü ve uzun olmalı
-- Rate limiting aktif
+- Rate limiting paketi projede mevcut ancak varsayılan olarak devre dışı; ihtiyaç halinde `backend/src/index.ts` içerisinde yapılandırın
 - CORS sadece production domain'ini içermeli
 
 ---

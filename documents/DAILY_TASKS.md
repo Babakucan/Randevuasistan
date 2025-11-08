@@ -1,5 +1,7 @@
 # Günlük Görev Takibi - Randevuasistan
 
+> **Bilgilendirme (Kasım 2025):** Bu belge Supabase tabanlı V1 yol haritasından kalan notları içerir. V2 mimarisi Express + Prisma'ya geçtiği için günlük planlamalar `documents/V2_ROADMAP.md` ve `documents/CHANGELOG.md` ile izlenmektedir. Aşağıdaki içerik sadece arşiv amaçlıdır.
+
 ## 📅 Bugünün Görevleri (12.08.2025)
 
 ### 🔴 Kritik Görevler (Bugün Tamamlanmalı)

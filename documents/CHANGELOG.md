@@ -5,6 +5,21 @@ Tüm önemli değişiklikler bu dosyada dokümante edilmiştir.
 Format [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/) standardına göre,
 ve bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 
+## [2.1.1] - 2025-11-07 - Dokümantasyon Senkronizasyonu
+
+### 📝 Dokümantasyon
+- README güncellendi: mevcut özellikler, kuruluma dair komutlar ve multi-tenant akışı yeniden yazıldı
+- `documents/ARCHITECTURE.md` mevcut katmanlar, modüller ve veri akışına göre yenilendi
+- `documents/API.md` Express uçlarının gerçek URL'leri, istek/gövde örnekleri ve dashboard yanıtlarıyla güncellendi
+- `documents/DEPLOYMENT.md`, `DEPLOYMENT_INSTRUCTIONS.md`, `VPS_DEPLOYMENT_CHECKLIST.md` üretim ortamı için güncel komutlar, `.env` örnekleri ve güvenlik notlarıyla senkronize edildi
+- AI, rate limit ve çağrı yönetimi gibi henüz aktif olmayan özellikler "gelecek" olarak işaretlendi
+
+### 🛠️ Bakım
+- Rate limit ortam değişkeni örnekleri kaldırıldı (özellik henüz etkin olmadığından)
+- Deployment scriptlerinin manuel inceleme/güncelleme adımları eklendi
+
+---
+
 ## [2.1.0] - 2025-11-06 - Temizlik ve Optimizasyon
 
 ### 🧹 Temizlik
@@ -151,6 +166,6 @@ ve bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 
 **Not:** Bu changelog otomatik güncellenmez. Her versiyon için manuel olarak güncellenmelidir.
 
-**Son Güncelleme:** V2.1.0  
+**Son Güncelleme:** V2.1.1  
 **Sonraki Versiyon:** V2.2.0
 

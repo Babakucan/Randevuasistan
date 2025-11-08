@@ -1,109 +1,50 @@
-# API Dokümantasyonu - Randevuasistan
+# Randevu Asistan REST API Dokümantasyonu
 
-Bu dokümantasyon, Randevuasistan backend API'sinin tüm endpoint'lerini ve kullanımlarını içerir.
+Bu doküman Express.js tabanlı backend API'si için güncel uç noktaları ve sözleşmeleri içerir. İstemci örnekleri `frontend/lib/api.ts` dosyasında bulunabilir.
 
-## Base URL
+## Temel Bilgiler
+- **Geliştirme tabanı:** `http://localhost:3001`
+- **Üretim tabanı:** VPS yapılandırmasına bağlıdır (örn. `https://<domain>`). Nginx üzerinden `/` köküne yayınlanır.
+- Tüm `/auth` uçları hariç isteklerde JWT zorunludur:
+  ```http
+  Authorization: Bearer <token>
+  Content-Type: application/json
+  ```
+- Çoklu salon desteği için `salonId` query parametresi kullanılabilir. Parametre gönderilmezse backend kullanıcının ilk salonunu seçer.
 
-Production: `https://randevucun.shop/api`  
-Development: `http://localhost:3001/api`
+## 1. Kimlik Doğrulama (`/auth`)
 
-## Authentication
+| Metot & Yol | Açıklama | Body |
+| --- | --- | --- |
+| `POST /auth/register` | Kullanıcı + ilk salon kaydı | `{ email, password, name, salonName, phone? }` |
+| `POST /auth/login` | Giriş yapar | `{ email, password }` |
+| `GET /auth/me` | Oturum açmış kullanıcıyı döndürür | — |
 
-Tüm endpoint'ler (auth hariç) JWT token gerektirir. Token'ı `Authorization` header'ında gönderin:
-
-```
-Authorization: Bearer <token>
-```
-
-## Endpoints
-
-### Authentication
-
-#### POST `/api/auth/register`
-Yeni kullanıcı kaydı.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "password123",
-  "name": "Kullanıcı Adı",
-  "salonName": "Salon Adı",
-  "phone": "5551234567"
-}
-```
-
-**Response:**
+**Başarılı Login/Register Yanıtı** (özet):
 ```json
 {
   "success": true,
+  "message": "Login successful",
   "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com",
-      "name": "Kullanıcı Adı",
-      "role": "user"
-    },
-    "salonProfiles": [...],
-    "currentSalonId": "uuid",
-    "token": "jwt_token"
+    "user": { "id": "uuid", "email": "user@example.com", "name": "Kullanıcı", "role": "user" },
+    "salonProfiles": [{ "id": "salon-uuid", "name": "Salon Adı" }],
+    "currentSalonId": "salon-uuid",
+    "token": "jwt-token"
   }
 }
 ```
 
-#### POST `/api/auth/login`
-Kullanıcı girişi.
+## 2. Salon Yönetimi (`/salons`)
 
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
+| Metot & Yol | Açıklama |
+| --- | --- |
+| `GET /salons` | Oturum açmış kullanıcının tüm salon profilleri |
+| `GET /salons/:id` | Belirli salon detayı (kullanıcıya ait olmalı) |
+| `POST /salons` | Yeni salon oluşturur |
+| `PUT /salons/:id` | Salon bilgisini günceller |
+| `DELETE /salons/:id` | Kullanıcının salonunu siler |
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "user": {...},
-    "salonProfiles": [...],
-    "currentSalonId": "uuid",
-    "token": "jwt_token"
-  }
-}
-```
-
-#### GET `/api/auth/me`
-Mevcut kullanıcı bilgileri.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "name": "Kullanıcı Adı",
-    "role": "user",
-    "salonProfiles": [...]
-  }
-}
-```
-
-### Salons
-
-#### GET `/api/salons?salonId=<uuid>`
-Tüm salon profillerini getirir.
-
-#### GET `/api/salons/:id?salonId=<uuid>`
-Belirli bir salon profilini getirir.
-
-#### POST `/api/salons?salonId=<uuid>`
-Yeni salon profili oluşturur.
-
-**Request Body:**
+**Salon Oluşturma Gövdesi**
 ```json
 {
   "name": "Salon Adı",
@@ -111,222 +52,186 @@ Yeni salon profili oluşturur.
   "phone": "5551234567",
   "email": "salon@example.com",
   "address": "Adres",
-  "description": "Açıklama"
+  "description": "Kısa açıklama",
+  "logoUrl": "https://...",
+  "workingHours": { "monday": { "open": "09:00", "close": "18:00" } }
 }
 ```
 
-#### PUT `/api/salons/:id?salonId=<uuid>`
-Salon profilini günceller.
+## 3. Müşteri Yönetimi (`/customers`)
+Tüm uçlar JWT ister ve `salonId` (opsiyonel) query parametresini destekler.
 
-#### DELETE `/api/salons/:id?salonId=<uuid>`
-Salon profilini siler.
+| Metot & Yol | Açıklama |
+| --- | --- |
+| `GET /customers` | Aktif salonun tüm müşterileri (+ son randevular) |
+| `GET /customers/:id` | Salon kapsamında müşteri detayı (son 10 randevu) |
+| `POST /customers` | Yeni müşteri oluşturur |
+| `PUT /customers/:id` | Müşteri verilerini günceller |
+| `DELETE /customers/:id` | Müşteriyi siler |
 
-### Employees
-
-#### GET `/api/employees?salonId=<uuid>`
-Tüm çalışanları getirir.
-
-#### GET `/api/employees/:id?salonId=<uuid>`
-Belirli bir çalışanı getirir.
-
-#### POST `/api/employees?salonId=<uuid>`
-Yeni çalışan oluşturur.
-
-**Request Body:**
-```json
-{
-  "name": "Çalışan Adı",
-  "email": "employee@example.com",
-  "phone": "5551234567",
-  "position": "Kuaför",
-  "specialties": ["Saç Kesimi", "Boyama"],
-  "workingHours": {
-    "monday": {"start": "09:00", "end": "18:00"},
-    "tuesday": {"start": "09:00", "end": "18:00"}
-  },
-  "leaveDays": ["saturday", "sunday"],
-  "bio": "Açıklama",
-  "experienceYears": 5,
-  "hourlyRate": 150
-}
-```
-
-#### PUT `/api/employees/:id?salonId=<uuid>`
-Çalışan bilgilerini günceller.
-
-#### DELETE `/api/employees/:id?salonId=<uuid>`
-Çalışanı siler.
-
-#### POST `/api/employees/:id/services?salonId=<uuid>`
-Çalışana hizmet atar veya kaldırır.
-
-**Request Body:**
-```json
-{
-  "serviceId": "uuid",
-  "assign": true
-}
-```
-
-### Services
-
-#### GET `/api/services?salonId=<uuid>`
-Tüm hizmetleri getirir.
-
-#### GET `/api/services/:id?salonId=<uuid>`
-Belirli bir hizmeti getirir.
-
-#### POST `/api/services?salonId=<uuid>`
-Yeni hizmet oluşturur.
-
-**Request Body:**
-```json
-{
-  "name": "Hizmet Adı",
-  "description": "Açıklama",
-  "duration": 60,
-  "price": 200,
-  "category": "Saç Kesimi",
-  "isActive": true
-}
-```
-
-#### PUT `/api/services/:id?salonId=<uuid>`
-Hizmeti günceller.
-
-#### DELETE `/api/services/:id?salonId=<uuid>`
-Hizmeti siler.
-
-### Customers
-
-#### GET `/api/customers?salonId=<uuid>`
-Tüm müşterileri getirir.
-
-#### GET `/api/customers/:id?salonId=<uuid>`
-Belirli bir müşteriyi getirir.
-
-#### POST `/api/customers?salonId=<uuid>`
-Yeni müşteri oluşturur.
-
-**Request Body:**
+**Örnek İstek (POST /customers)**
 ```json
 {
   "name": "Müşteri Adı",
   "phone": "5551234567",
   "email": "customer@example.com",
-  "birthDate": "1990-01-01",
-  "notes": "Notlar",
-  "preferences": {}
+  "birthDate": "1995-06-01",
+  "notes": "VIP müşteri"
 }
 ```
 
-#### PUT `/api/customers/:id?salonId=<uuid>`
-Müşteri bilgilerini günceller.
+## 4. Çalışan Yönetimi (`/employees`)
 
-#### DELETE `/api/customers/:id?salonId=<uuid>`
-Müşteriyi siler.
+| Metot & Yol | Açıklama |
+| --- | --- |
+| `GET /employees` | Salon çalışan listesi (atanan hizmetlerle) |
+| `GET /employees/:id` | Çalışan detayı (+ son 10 randevu) |
+| `POST /employees` | Yeni çalışan |
+| `PUT /employees/:id` | Çalışan güncelleme |
+| `DELETE /employees/:id` | Çalışan silme |
+| `POST /employees/:id/services` | Hizmet atama/kaldırma |
 
-### Appointments
+**Hizmet Atama İsteği**
+```json
+{
+  "serviceId": "service-uuid",
+  "assign": true
+}
+```
+`assign: true` → hizmeti atar (upsert), `false` → ilişkisini siler.
 
-#### GET `/api/appointments?salonId=<uuid>`
-Tüm randevuları getirir.
+## 5. Hizmet Yönetimi (`/services`)
 
-#### GET `/api/appointments/:id?salonId=<uuid>`
-Belirli bir randevuyu getirir.
+| Metot & Yol | Açıklama |
+| --- | --- |
+| `GET /services` | Salon hizmet listesi |
+| `GET /services/:id` | Hizmet detayı |
+| `POST /services` | Yeni hizmet |
+| `PUT /services/:id` | Hizmet güncelleme |
+| `DELETE /services/:id` | Hizmet silme |
 
-#### POST `/api/appointments?salonId=<uuid>`
-Yeni randevu oluşturur.
+**Örnek Gövde (POST /services)**
+```json
+{
+  "name": "Saç Kesimi",
+  "description": "Profesyonel saç kesimi",
+  "duration": 45,
+  "price": 200,
+  "category": "Kesim",
+  "isActive": true
+}
+```
 
-**Request Body:**
+## 6. Randevu Yönetimi (`/appointments`)
+
+| Metot & Yol | Açıklama |
+| --- | --- |
+| `GET /appointments` | Salon randevu listesi (customer/service/employee nested) |
+| `GET /appointments/:id` | Randevu detayı |
+| `POST /appointments` | Yeni randevu |
+| `PUT /appointments/:id` | Randevu güncelleme |
+| `DELETE /appointments/:id` | Randevu silme |
+
+**Gerekli Alanlar (POST /appointments)**
 ```json
 {
   "customerId": "uuid",
   "serviceId": "uuid",
-  "employeeId": "uuid",
+  "employeeId": "uuid",         // opsiyonel
   "startTime": "2025-11-10T10:00:00Z",
-  "status": "scheduled",
-  "notes": "Notlar",
-  "source": "manual"
+  "endTime": "2025-11-10T11:00:00Z",
+  "status": "scheduled",        // optional (default: scheduled)
+  "notes": "İlk randevu",
+  "source": "manual"            // optional (manual | whatsapp | phone | ai)
 }
 ```
+`PUT` isteklerinde alanlar kısmi olarak gönderilebilir.
 
-#### PUT `/api/appointments/:id?salonId=<uuid>`
-Randevuyu günceller.
-
-#### DELETE `/api/appointments/:id?salonId=<uuid>`
-Randevuyu siler.
-
-### Dashboard
-
-#### GET `/api/dashboard/stats?salonId=<uuid>`
-Dashboard istatistiklerini getirir.
-
-**Response:**
+**Başarılı Oluşturma Yanıtı**
 ```json
 {
   "success": true,
+  "message": "Appointment created successfully",
   "data": {
-    "totalCustomers": 100,
-    "totalEmployees": 5,
-    "totalServices": 10,
-    "todayAppointments": 5,
-    "todayEarnings": 1000,
-    "upcomingAppointments": 3
+    "id": "uuid",
+    "salonId": "uuid",
+    "customerId": "uuid",
+    "serviceId": "uuid",
+    "employeeId": "uuid",
+    "startTime": "2025-11-10T10:00:00.000Z",
+    "endTime": "2025-11-10T11:00:00.000Z",
+    "status": "scheduled",
+    "source": "manual",
+    "createdAt": "...",
+    "updatedAt": "...",
+    "customer": { "...": "..." },
+    "service": { "...": "..." },
+    "employee": { "...": "..." }
   }
 }
 ```
 
-#### GET `/api/dashboard/activities?salonId=<uuid>`
-Son aktiviteleri getirir.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "type": "appointment_created",
-      "description": "Yeni randevu oluşturuldu",
-      "createdAt": "2025-11-06T10:00:00Z"
+## 7. Dashboard (`/dashboard`)
+- `GET /dashboard/stats`: Salon bazlı toplu metrikler
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalAppointments": 128,
+      "totalCustomers": 86,
+      "totalEmployees": 9,
+      "totalServices": 14,
+      "todayAppointments": 5,
+      "todayEarnings": 1450,
+      "thisWeekAppointments": 32,
+      "thisMonthEarnings": 18750
     }
-  ]
-}
-```
+  }
+  ```
+- `GET /dashboard/activities`: Son 10 aktivite (randevu/müşteri/çalışan/hizmet)
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": "uuid",
+        "type": "appointment",
+        "description": "Fatma Şahin randevu aldı",
+        "details": "Saç Kesimi - Ahmet Yılmaz",
+        "timestamp": "2025-11-07T09:32:00.000Z"
+      }
+    ]
+  }
+  ```
 
-## Error Responses
-
-Tüm hatalar aşağıdaki formatta döner:
-
+## 8. Hata Formatı
+Tüm hatalar `AppError` veya genel hata yakalayıcısı tarafından standart formata çevrilir.
 ```json
 {
   "success": false,
-  "message": "Error message",
+  "message": "Validation error",
   "errors": [
-    {
-      "path": ["field"],
-      "message": "Validation error message"
-    }
+    { "path": ["customerId"], "message": "Expected string, received null" }
   ]
 }
 ```
 
-## Status Codes
+HTTP durum kodları:
+- `200 OK` – başarılı GET/PUT/DELETE
+- `201 Created` – başarılı POST
+- `400 Bad Request` – Zod doğrulama hatası veya eksik veri
+- `401 Unauthorized` – JWT yok/invalid
+- `403 Forbidden` – (Kullanımda değil; gerekli olursa `authorize()` ile eklenebilir)
+- `404 Not Found` – Salon kapsamı dışında kayıt veya bulunamadı
+- `500 Internal Server Error` – Beklenmeyen hata
 
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request (Validation error)
-- `401` - Unauthorized (Missing or invalid token)
-- `404` - Not Found
-- `500` - Internal Server Error
-
-## Notes
-
-- Tüm endpoint'ler `salonId` query parametresi ile çoklu salon desteği sağlar
-- Tarih formatları ISO 8601 formatında olmalıdır
-- Decimal değerler (fiyat, ücret) string olarak gönderilebilir, backend otomatik dönüştürür
+## 9. Entegrasyon Notları
+- `salonId` parametresi gönderilmezse backend otomatik olarak kullanıcının erişebildiği ilk salonu kullanır.
+- Prisma decimal alanları JavaScript tarafında string veya number olarak kabul eder; API string dönebilir.
+- Tarih alanları ISO 8601 formatında beklenir (`.datetime()` Zod doğrulaması).
+- Rate limit middleware'i henüz etkinleştirilmemiştir; ihtiyaç halinde `index.ts` içinde konfigüre edilebilir.
 
 ---
-
-**Son Güncelleme:** V2.1.0  
-**Tarih:** 2025-11-06
+**Son Güncelleme:** Kasım 2025  
+**Sorumlu:** Backend Ekibi
 

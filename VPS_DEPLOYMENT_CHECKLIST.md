@@ -97,6 +97,7 @@ cd ../frontend
 npm install
 npm run build
 ```
+> Not: Kök dizinde `npm run install:all` çalıştırarak tüm workspace bağımlılıklarını tek seferde yükleyebilirsiniz.
 
 ### 4. Prisma Database Setup
 ```bash
@@ -127,12 +128,8 @@ JWT_EXPIRES_IN=7d
 
 CORS_ORIGIN=https://yourdomain.com
 
-# AI (Gelecekte)
+# AI (opsiyonel)
 OPENAI_API_KEY=your_openai_api_key_here
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
 ```
 
 ### Frontend `.env.local` Dosyası Oluşturma
@@ -144,8 +141,8 @@ nano .env.local
 İçerik:
 ```env
 NEXT_PUBLIC_API_URL=https://yourdomain.com/api
-# veya backend aynı domain'deyse:
-# NEXT_PUBLIC_API_URL=https://yourdomain.com/api
+# Eğer backend ayrı bir subdomain'de çalışıyorsa:
+# NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 ```
 
 ---
